@@ -1,0 +1,195 @@
+/**
+ * ======================================================
+ * ARCHIVO: sequence.puml
+ * UBICACIÓN: menu-qr-system/docs/diagrams/sequence.puml
+ * FASE: DOC
+ * VERSIÓN: 1.0
+ * ÚLTIMA ACTUALIZACIÓN: 2024-01-17 02:30
+ *
+ * 🎯 PROPÓSITO:
+ * Diagrama de secuencia que muestra el flujo completo
+ * de un pedido desde que el cliente escanea el QR
+ * hasta que el restaurante recibe la notificación
+ * por WhatsApp.
+ *
+ * 📦 NOTA:
+ * Este archivo debe ser renderizado con PlantUML
+ *
+ * 🔗 RELACIONES:
+ * - Visualiza el flujo de negocio principal
+ *
+ * 📋 HISTORIAL DE CAMBIOS:
+ * ------------------------------------------------------
+ * 1.0 - 2024-01-17 02:30
+ *    ✅ Creación inicial del diagrama
+ *    ✅ Flujo de pedido a domicilio
+ *    ✅ Flujo de pedido desde mesa
+ *    ✅ Manejo de caché y colas
+ * ======================================================
+ */
+
+@startuml MENU_QR_PLUS_SEQUENCE
+!theme plain
+
+title MENU QR PLUS - Diagrama de Secuencia (Pedido a Domicilio)
+
+' ======================================================
+' ACTORES Y PARTICIPANTES
+' ======================================================
+
+actor "Cliente" as Client #FFE8E8
+participant "Frontend\n(React)" as Frontend #F0F0F0
+participant "API Gateway" as Gateway #F0F0F0
+participant "Menu Service" as MenuService #F0F0F0
+database "Redis\n(Caché)" as Redis #E8FDE8
+database "PostgreSQL\n(Read Replica)" as DBRead #E8FDE8
+database "RabbitMQ\n(Cola)" as Queue #E8FDE8
+participant "Order Service" as OrderService #F0F0F0
+participant "WhatsApp Service" as WhatsAppService #F0F0F0
+actor "Dueño" as Owner #FFE8E8
+
+' ======================================================
+' FLUJO: OBTENCIÓN DEL MENÚ
+' ======================================================
+
+== 1. Acceso al menú ==
+
+Client -> Frontend: Escanea QR / Abre link
+activate Frontend
+
+Frontend -> Gateway: GET /:slug/menu
+activate Gateway
+
+Gateway -> MenuService: Obtener menú
+activate MenuService
+
+MenuService -> Redis: Buscar menú en caché
+activate Redis
+
+alt Caché encontrado
+    Redis --> MenuService: Retorna menú cacheado
+else Caché no encontrado
+    Redis --> MenuService: null
+    MenuService -> DBRead: SELECT * FROM categories + products
+    activate DBRead
+    DBRead --> MenuService: Retorna categorías y productos
+    deactivate DBRead
+    MenuService -> Redis: Guardar en caché (TTL 5min)
+    MenuService --> Redis
+end
+deactivate Redis
+
+MenuService --> Gateway: Retorna menú formateado
+deactivate MenuService
+
+Gateway --> Frontend: 200 OK + menú
+deactivate Gateway
+
+Frontend --> Client: Muestra menú interactivo
+
+' ======================================================
+' FLUJO: ARMADO DEL PEDIDO
+' ======================================================
+
+== 2. Cliente arma el pedido ==
+
+Client -> Frontend: Agrega productos al carrito
+Frontend -> Frontend: Actualiza estado local (Zustand)
+
+Client -> Frontend: Procede al checkout
+
+' ======================================================
+' FLUJO: ENVÍO DEL PEDIDO
+' ======================================================
+
+== 3. Envío del pedido ==
+
+Client -> Frontend: Completa datos y confirma
+Frontend -> Gateway: POST /order
+activate Gateway
+
+Gateway -> OrderService: Crear pedido
+activate OrderService
+
+OrderService -> DBRead: Validar productos y precios
+activate DBRead
+DBRead --> OrderService: Productos validados
+deactivate DBRead
+
+OrderService -> OrderService: Calcular totales
+
+alt Tipo domicilio
+    OrderService -> OrderService: Verificar cobertura
+end
+
+OrderService -> DBRead: INSERT INTO orders (pending)
+activate DBRead
+DBRead --> OrderService: Pedido creado
+deactivate DBRead
+
+OrderService -> Queue: Publicar mensaje en cola
+activate Queue
+Queue --> OrderService: Mensaje encolado
+deactivate Queue
+
+OrderService --> Gateway: 201 Created
+deactivate OrderService
+
+Gateway --> Frontend: { order_id, order_number }
+deactivate Gateway
+
+Frontend --> Client: Pedido recibido, abriendo WhatsApp...
+
+' ======================================================
+' FLUJO: PROCESAMIENTO ASÍNCRONO
+' ======================================================
+
+== 4. Procesamiento en segundo plano ==
+
+Queue -> OrderService: Consumir mensaje
+activate OrderService
+
+OrderService -> DBRead: Obtener datos completos
+activate DBRead
+DBRead --> OrderService: Datos del pedido
+deactivate DBRead
+
+OrderService -> WhatsAppService: Generar mensaje
+activate WhatsAppService
+
+WhatsAppService -> WhatsAppService: Formatear pedido
+
+WhatsAppService --> OrderService: Mensaje listo
+deactivate WhatsAppService
+
+OrderService -> DBRead: UPDATE orders SET status = 'confirmed'
+activate DBRead
+deactivate DBRead
+
+OrderService -> WhatsApp: Abrir enlace wa.me
+OrderService --> Queue: Confirmar procesamiento
+
+deactivate OrderService
+
+' ======================================================
+' FLUJO: NOTIFICACIÓN AL RESTAURANTE
+' ======================================================
+
+== 5. Restaurante recibe el pedido ==
+
+WhatsApp -> Owner: Mensaje con detalle del pedido
+Owner -> Owner: Confirma y prepara pedido
+
+' ======================================================
+' NOTAS ADICIONALES
+' ======================================================
+
+note over Client, Owner
+  <b>Tiempos estimados:</b>
+  - Carga del menú: < 500ms (con caché)
+  - Creación del pedido: < 300ms
+  - Procesamiento async: < 2s
+  - Notificación WhatsApp: inmediata
+end note
+
+@enduml

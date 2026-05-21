@@ -1,0 +1,244 @@
+/**
+ * ======================================================
+ * ARCHIVO: globals.css
+ * UBICACIÓN: menu-qr-system/frontend/src/styles/globals.css
+ * FASE: F1
+ * VERSIÓN: 1.0
+ * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 17:00
+ *
+ * 🎯 PROPÓSITO:
+ * Estilos globales de la aplicación y configuración
+ * de Tailwind CSS. Incluye estilos base, utilidades
+ * personalizadas y clases para scrollbar.
+ *
+ * 📦 DEPENDENCIAS:
+ * - tailwindcss: Framework de estilos
+ *
+ * 🔗 RELACIONES:
+ * - Importado por: main.jsx
+ *
+ * 📋 HISTORIAL DE CAMBIOS:
+ * ------------------------------------------------------
+ * 1.0 - 2024-01-16 17:00
+ *    ✅ Creación inicial del archivo
+ *    ✅ Directivas de Tailwind
+ *    ✅ Estilos base personalizados
+ *    ✅ Scrollbar personalizado para móvil
+ *    ✅ Utilidades adicionales
+ * ======================================================
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======================================================
+ * ESTILOS BASE PERSONALIZADOS
+ * ====================================================== */
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply bg-gray-50 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  
+  /* Mejorar legibilidad en dispositivos móviles */
+  @media (max-width: 640px) {
+    html {
+      font-size: 14px;
+    }
+  }
+}
+
+/* ======================================================
+ * UTILIDADES PERSONALIZADAS
+ * ====================================================== */
+
+@layer utilities {
+  /* Ocultar scrollbar en elementos con overflow-x */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Línea de texto truncada */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* Animaciones de entrada */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* ======================================================
+ * ESTILOS DE COMPONENTES
+ * ====================================================== */
+
+@layer components {
+  /* Botón primario */
+  .btn-primary {
+    @apply bg-orange-600 text-white px-4 py-2 rounded-lg font-medium 
+           hover:bg-orange-700 transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2;
+  }
+  
+  /* Botón secundario */
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium 
+           hover:bg-gray-300 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2;
+  }
+  
+  /* Botón de éxito (WhatsApp) */
+  .btn-success {
+    @apply bg-green-600 text-white px-4 py-2 rounded-lg font-medium 
+           hover:bg-green-700 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2;
+  }
+  
+  /* Input estándar */
+  .input-standard {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg 
+           focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
+           disabled:bg-gray-100 disabled:cursor-not-allowed;
+  }
+  
+  /* Card estándar */
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden;
+  }
+  
+  /* Badge de estado */
+  .badge-open {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+  }
+  
+  .badge-closed {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800;
+  }
+  
+  .badge-popular {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-600;
+  }
+  
+  .badge-new {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-600;
+  }
+  
+  .badge-vegan {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-600;
+  }
+}
+
+/* ======================================================
+ * ESTILOS PARA MODIFICADORES Y CARRITO
+ * ====================================================== */
+
+/* Evitar desbordamiento en textos largos */
+.product-name {
+  word-break: break-word;
+}
+
+/* Estilo para elementos deshabilitados */
+.disabled-overlay {
+  @apply opacity-50 cursor-not-allowed pointer-events-none;
+}
+
+/* Transiciones suaves */
+.transition-smooth {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* ======================================================
+ * ESTILOS PARA TABLET/DESKTOP
+ * ====================================================== */
+
+@media (min-width: 768px) {
+  .container-custom {
+    @apply max-w-2xl mx-auto;
+  }
+}
+
+/* ======================================================
+ * ESTILOS DE ACCESIBILIDAD
+ * ====================================================== */
+
+/* Enfoque visible para navegación por teclado */
+*:focus-visible {
+  @apply outline-none ring-2 ring-orange-500 ring-offset-2;
+}
+
+/* Alto contraste para textos */
+.text-contrast {
+  @apply text-gray-900;
+}
+
+.text-contrast-secondary {
+  @apply text-gray-600;
+}

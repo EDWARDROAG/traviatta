@@ -1,0 +1,87 @@
+{
+  "_comment": "ARCHIVO: package.json\nUBICACIÓN: menu-qr-system/backend/package.json\nFASE: F0\nVERSIÓN: 1.0\nÚLTIMA ACTUALIZACIÓN: 2024-01-15 10:30\nPROPÓSITO: Definir el manifiesto del proyecto backend Node.js, incluyendo dependencias de producción y desarrollo, scripts útiles para desarrollo, pruebas y producción.\nDEPENDENCIAS PRINCIPALES: express, pg, redis, amqplib, jsonwebtoken, bcrypt, cloudinary, multer, joi, winston, cors, helmet.\nDEPENDENCIAS DE DESARROLLO: nodemon, jest, supertest, eslint.\nRELACIONES: Es importado por Dockerfile, scripts de npm. Dependencias instaladas vía npm install.\nHISTORIAL DE CAMBIOS: 1.0 - 2024-01-15 10:30.\n  ✅ Creación inicial del archivo\n  ✅ Definición de dependencias base\n  ✅ Scripts para dev, test, build, start\n  ✅ Configuración de engines (Node.js 18+)",
+  "name": "menu-qr-backend",
+  "version": "1.0.0",
+  "description": "Backend API para sistema de menú digital con WhatsApp y gestión de mesas",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:integration": "jest --testMatch='**/integration/**/*.test.js'",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.js'",
+    "migrate": "node scripts/migrate.js",
+    "migrate:undo": "node scripts/migrate.js undo",
+    "seed": "node scripts/seed.js",
+    "db:reset": "npm run migrate:undo && npm run migrate && npm run seed",
+    "health": "curl -f http://localhost:3005/health",
+    "docker:build": "docker build -t menu-backend .",
+    "docker:run": "docker run -p 3005:3005 --env-file .env menu-backend"
+  },
+  "keywords": [
+    "menu-digital",
+    "whatsapp",
+    "restaurant",
+    "qr-menu",
+    "express",
+    "postgresql"
+  ],
+  "author": "MENU QR PLUS Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.12",
+    "amqplib": "^0.10.3",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "cloudinary": "^1.41.0",
+    "multer": "^1.4.5-lts.1",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "express-rate-limit": "^7.1.5",
+    "rate-limit-redis": "^4.2.0",
+    "qrcode": "^1.5.3",
+    "slugify": "^1.6.6",
+    "uuid": "^9.0.1",
+    "compression": "^1.7.4",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "@types/jest": "^29.5.11",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-node": "^11.1.0",
+    "prettier": "^3.1.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/tests/unit/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"]
+  }
+}

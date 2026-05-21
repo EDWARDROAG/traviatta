@@ -1,0 +1,223 @@
+/**
+ * ======================================================
+ * ARCHIVO: components.puml
+ * UBICACIÓN: menu-qr-system/docs/diagrams/components.puml
+ * FASE: DOC
+ * VERSIÓN: 1.0
+ * ÚLTIMA ACTUALIZACIÓN: 2024-01-17 02:00
+ *
+ * 🎯 PROPÓSITO:
+ * Diagrama de componentes que muestra la arquitectura
+ * general del sistema MENU QR PLUS, incluyendo los
+ * componentes principales, sus dependencias y las
+ * interfaces de comunicación.
+ *
+ * 📦 NOTA:
+ * Este archivo debe ser renderizado con PlantUML
+ *
+ * 🔗 RELACIONES:
+ * - Visualiza la arquitectura del sistema
+ *
+ * 📋 HISTORIAL DE CAMBIOS:
+ * ------------------------------------------------------
+ * 1.0 - 2024-01-17 02:00
+ *    ✅ Creación inicial del diagrama
+ *    ✅ Componentes del frontend
+ *    ✅ Componentes del backend
+ *    ✅ Base de datos y servicios externos
+ * ======================================================
+ */
+
+@startuml MENU_QR_PLUS_COMPONENTS
+!theme plain
+
+title MENU QR PLUS - Diagrama de Componentes
+
+' ======================================================
+' ESTILOS
+' ======================================================
+
+skinparam component {
+  BackgroundColor #F0F0F0
+  BorderColor #333333
+  FontColor #000000
+  FontSize 12
+}
+
+skinparam interface {
+  BackgroundColor #E8F4FD
+  BorderColor #0066CC
+}
+
+skinparam database {
+  BackgroundColor #E8FDE8
+  BorderColor #008800
+}
+
+skinparam node {
+  BackgroundColor #FFF8E8
+  BorderColor #CC8800
+}
+
+skinparam actor {
+  BackgroundColor #FFE8E8
+  BorderColor #CC0000
+}
+
+' ======================================================
+' ACTORES
+' ======================================================
+
+actor "Cliente" as Client #FFE8E8
+actor "Dueño" as Owner #FFE8E8
+actor "Mesero" as Waiter #FFE8E8
+
+' ======================================================
+' NODO FRONTEND
+' ======================================================
+
+node "Frontend" {
+  component "Menú Digital" as MenuUI
+  component "Carrito de Compras" as CartUI
+  component "Checkout" as CheckoutUI
+  component "Panel Admin" as AdminUI
+  
+  MenuUI --> CartUI : usa
+  CartUI --> CheckoutUI : procede
+}
+
+' ======================================================
+' NODO BACKEND
+' ======================================================
+
+node "Backend API" {
+  
+  component "API Gateway" as Gateway
+  component "Auth Service" as AuthService
+  component "Menu Service" as MenuService
+  component "Order Service" as OrderService
+  component "Table Service" as TableService
+  component "Branch Service" as BranchService
+  component "WhatsApp Service" as WhatsAppService
+  component "Cache Service" as CacheService
+  
+  Gateway --> AuthService
+  Gateway --> MenuService
+  Gateway --> OrderService
+  Gateway --> TableService
+  Gateway --> BranchService
+  
+  MenuService --> CacheService
+  OrderService --> CacheService
+  OrderService --> WhatsAppService
+}
+
+' ======================================================
+' BASE DE DATOS
+' ======================================================
+
+database "PostgreSQL" as DB {
+  component "Tenants" as TenantsDB
+  component "Branches" as BranchesDB
+  component "Tables" as TablesDB
+  component "Categories" as CategoriesDB
+  component "Products" as ProductsDB
+  component "Orders" as OrdersDB
+}
+
+database "Redis" as Redis {
+  component "Caché" as CacheDB
+  component "Sesiones" as SessionsDB
+  component "Rate Limit" as RateLimitDB
+}
+
+database "RabbitMQ" as RabbitMQ {
+  component "Cola de Pedidos" as OrderQueue
+  component "Cola de Notificaciones" as NotifQueue
+}
+
+' ======================================================
+' SERVICIOS EXTERNOS
+' ======================================================
+
+cloud "Cloudinary" as Cloudinary
+cloud "WhatsApp" as WhatsApp
+
+' ======================================================
+' CONEXIONES - CLIENTE
+' ======================================================
+
+Client --> MenuUI : "HTTPS / QR"
+Client --> CartUI : "HTTPS"
+Client --> CheckoutUI : "HTTPS"
+
+' ======================================================
+' CONEXIONES - BACKEND
+' ======================================================
+
+MenuUI --> Gateway : "REST API"
+CartUI --> Gateway : "REST API"
+CheckoutUI --> Gateway : "REST API"
+AdminUI --> Gateway : "REST API"
+
+' ======================================================
+' CONEXIONES - DUEÑO/MESERO
+' ======================================================
+
+Owner --> AdminUI : "HTTPS"
+Waiter --> AdminUI : "HTTPS"
+
+' ======================================================
+' CONEXIONES - SERVICIOS
+' ======================================================
+
+Gateway --> DB : "SQL"
+Gateway --> Redis : "TCP"
+Gateway --> RabbitMQ : "AMQP"
+
+MenuService --> DB : "lecturas"
+MenuService --> Redis : "caché"
+
+OrderService --> DB : "escrituras"
+OrderService --> RabbitMQ : "publish"
+OrderService --> WhatsAppService : "llamada"
+
+WhatsAppService --> WhatsApp : "API"
+
+TableService --> DB : "CRUD"
+TableService --> RabbitMQ : "notificaciones"
+
+BranchService --> DB : "CRUD"
+
+AuthService --> DB : "autenticación"
+AuthService --> Redis : "sesiones"
+
+CacheService --> Redis : "almacenamiento"
+
+' ======================================================
+' CONEXIONES - COLA
+' ======================================================
+
+RabbitMQ --> OrderService : "consume"
+RabbitMQ --> WhatsAppService : "consume"
+
+' ======================================================
+' CONEXIONES - CLOUDINARY
+' ======================================================
+
+AdminUI --> Cloudinary : "imágenes"
+MenuUI --> Cloudinary : "imágenes"
+
+' ======================================================
+' LEYENDA
+' ======================================================
+
+legend right
+  | <#FFE8E8> Actor </#FFE8E8> | Usuario del sistema |
+  | <#F0F0F0> Componente </#F0F0F0> | Módulo del sistema |
+  | <#E8FDE8> Base de Datos </#E8FDE8> | Almacenamiento persistente |
+  | <#FFF8E8> Nodo </#FFF8E8> | Agrupación lógica |
+  | <#E8F4FD> Interface </#E8F4FD> | Punto de comunicación |
+endlegend
+
+@enduml

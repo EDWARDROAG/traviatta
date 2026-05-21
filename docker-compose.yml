@@ -1,0 +1,211 @@
+# ======================================================
+# ARCHIVO: docker-compose.yml
+# UBICACIÓN: menu-qr-system/docker-compose.yml
+# FASE: F0
+# VERSIÓN: 1.0
+# ÚLTIMA ACTUALIZACIÓN: 2024-01-15 10:00
+#
+# 🎯 PROPÓSITO:
+# Orquestar todos los servicios del sistema MENU QR PLUS
+# para entorno de desarrollo local con Docker Compose.
+# Define los contenedores: PostgreSQL, Redis, RabbitMQ,
+# Backend API, Frontend Cliente y Admin Panel.
+#
+# 📦 DEPENDENCIAS:
+# - Docker Engine 20.10+
+# - Docker Compose 2.0+
+# - Archivo .env con variables de entorno
+#
+# 🔗 RELACIONES:
+# - Importa variables de: .env
+# - Es utilizado por: docker-compose.prod.yml (base)
+#
+# 📋 HISTORIAL DE CAMBIOS:
+# ------------------------------------------------------
+# 1.0 - 2024-01-15 10:00
+#    ✅ Creación inicial del archivo
+#    ✅ Definición de servicios: postgres, redis, rabbitmq
+#    ✅ Definición de servicios: backend, frontend, admin
+#    ✅ Configuración de redes y volúmenes
+#    ✅ Health checks para todos los servicios
+# ======================================================
+
+version: '3.8'
+
+services:
+  # ==================================================
+  # POSTGRESQL - Base de datos principal
+  # ==================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: menu_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-menu_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
+      POSTGRES_DB: ${DB_NAME:-menu_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - menu_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-menu_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================================================
+  # REDIS - Caché distribuida y sesiones
+  # ==================================================
+  redis:
+    image: redis:7-alpine
+    container_name: menu_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - menu_network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================================================
+  # RABBITMQ - Cola de mensajes asíncrona
+  # ==================================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: menu_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5673}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15673}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - menu_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ==================================================
+  # BACKEND - API Node.js + Express
+  # ==================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: menu_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      DATABASE_URL: postgresql://${DB_USER:-menu_user}:${DB_PASSWORD:-secure_password}@postgres:5432/${DB_NAME:-menu_db}
+      DATABASE_URL_REPLICA: postgresql://${DB_USER:-menu_user}:${DB_PASSWORD:-secure_password}@postgres:5432/${DB_NAME:-menu_db}
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_key}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+    ports:
+      - "${BACKEND_PORT:-3005}:3005"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - menu_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================================================
+  # FRONTEND CLIENTE - Menú digital para clientes
+  # ==================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: menu_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - menu_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================================================
+  # ADMIN PANEL - Panel administrativo para dueños
+  # ==================================================
+  admin:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    container_name: menu_admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3006}:80"
+    volumes:
+      - ./admin-panel:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - menu_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ==================================================
+# REDES
+# ==================================================
+networks:
+  menu_network:
+    driver: bridge
+    name: menu_network
+
+# ==================================================
+# VOLÚMENES PERSISTENTES
+# ==================================================
+volumes:
+  postgres_data:
+    name: menu_postgres_data
+  redis_data:
+    name: menu_redis_data
+  rabbitmq_data:
+    name: menu_rabbitmq_data
+  uploads:
+    name: menu_uploads

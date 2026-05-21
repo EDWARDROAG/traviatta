@@ -1,0 +1,320 @@
+# ======================================================
+# ARCHIVO: docker-compose.prod.yml
+# UBICACIÓN: menu-qr-system/docker-compose.prod.yml
+# FASE: F6
+# VERSIÓN: 1.0
+# ÚLTIMA ACTUALIZACIÓN: 2024-01-16 11:00
+#
+# 🎯 PROPÓSITO:
+# Configuración de Docker Compose para entorno de
+# producción. Incluye optimizaciones de recursos,
+# health checks, y configuración de red para
+# alta disponibilidad.
+#
+# 📦 DEPENDENCIAS:
+# - Docker Engine 20.10+
+# - Docker Compose 2.0+
+# - Archivo .env con variables de entorno
+#
+# 🔗 RELACIONES:
+# - Importa variables de: .env
+# - Utiliza imágenes construidas localmente
+# ======================================================
+
+version: '3.8'
+
+services:
+  # ==================================================
+  # POSTGRESQL - Base de datos principal
+  # ==================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: menu_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # ==================================================
+  # POSTGRESQL REPLICA - Lectura (escalabilidad)
+  # ==================================================
+  postgres_replica:
+    image: postgres:15-alpine
+    container_name: menu_postgres_replica_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_replica_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - menu_network_prod
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # ==================================================
+  # REDIS - Caché distribuida
+  # ==================================================
+  redis:
+    image: redis:7-alpine
+    container_name: menu_redis_prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data_prod:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # ==================================================
+  # RABBITMQ - Cola de mensajes
+  # ==================================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: menu_rabbitmq_prod
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data_prod:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # ==================================================
+  # BACKEND API
+  # ==================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: menu-backend:latest
+    container_name: menu_backend_prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      DATABASE_URL_REPLICA: postgresql://${DB_USER}:${DB_PASSWORD}@postgres_replica:5432/${DB_NAME}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+    ports:
+      - "3005:3005"
+    volumes:
+      - uploads_prod:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  # ==================================================
+  # FRONTEND CLIENTE - Nginx
+  # ==================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: menu-frontend:latest
+    container_name: menu_frontend_prod
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # ==================================================
+  # ADMIN PANEL - Nginx
+  # ==================================================
+  admin:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    image: menu-admin:latest
+    container_name: menu_admin_prod
+    restart: always
+    ports:
+      - "3006:80"
+    depends_on:
+      - backend
+    networks:
+      - menu_network_prod
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # ==================================================
+  # NGINX REVERSE PROXY (Opcional)
+  # ==================================================
+  nginx:
+    image: nginx:alpine
+    container_name: menu_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - admin
+      - backend
+    networks:
+      - menu_network_prod
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+# ==================================================
+# REDES
+# ==================================================
+networks:
+  menu_network_prod:
+    driver: overlay
+    name: menu_network_prod
+    attachable: true
+
+# ==================================================
+# VOLÚMENES PERSISTENTES
+# ==================================================
+volumes:
+  postgres_data_prod:
+    name: menu_postgres_data_prod
+  postgres_replica_data_prod:
+    name: menu_postgres_replica_data_prod
+  redis_data_prod:
+    name: menu_redis_data_prod
+  rabbitmq_data_prod:
+    name: menu_rabbitmq_data_prod
+  uploads_prod:
+    name: menu_uploads_prod

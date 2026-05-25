@@ -51,6 +51,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Ignorar abort/cancelación de peticiones válidas
+    if (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.message === 'canceled') {
+      return Promise.reject(error);
+    }
+
     if (error.response) {
       // Error con respuesta del servidor
       console.error('API Error:', error.response.status, error.response.data);

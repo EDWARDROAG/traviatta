@@ -3,37 +3,30 @@
  * ARCHIVO: useAuth.js
  * UBICACIÓN: menu-qr-system/admin-panel/src/hooks/useAuth.js
  * FASE: F2
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 23:45
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 20:30
  *
  * 🎯 PROPÓSITO:
- * Hook personalizado para manejar la autenticación de
- * dueños de restaurantes en el panel administrativo.
- * Incluye login, logout, verificación de token y
- * persistencia de sesión.
+ * Hook personalizado para manejar la autenticación.
+ * VERSIÓN CORREGIDA - Inicializa checkAuth automáticamente.
  *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- * - axios: Cliente HTTP
- * - ../services/api: Configuración base
- *
- * 🔗 RELACIONES:
- * - Importado por: App.jsx, LoginPage.jsx, Sidebar.jsx
+ * 🐛 CORRECCIÓN: Se agregó useEffect para llamar checkAuth
+ *    al iniciar y cambiar el estado loading.
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.1 - 2024-05-22 20:30
+ *    ✅ Corregido: useEffect para inicializar checkAuth
+ *    ✅ Corregido: loading inicial true hasta verificar
+ * ------------------------------------------------------
  * 1.0 - 2024-01-16 23:45
  *    ✅ Creación inicial del archivo
- *    ✅ Estado de autenticación
- *    ✅ Función login
- *    ✅ Función logout
- *    ✅ Persistencia en localStorage
- *    ✅ Carga inicial del usuario
  * ======================================================
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useEffect } from 'react';
 import api from '../services/api';
 
 const useAuthStore = create(
@@ -90,7 +83,7 @@ const useAuthStore = create(
       checkAuth: async () => {
         const { token } = get();
         if (!token) {
-          set({ loading: false });
+          set({ loading: false, isAuthenticated: false });
           return false;
         }
 
@@ -118,10 +111,15 @@ const useAuthStore = create(
           return false;
         }
       },
+      
+      // Función para inicializar (llamada desde el hook)
+      init: async () => {
+        await get().checkAuth();
+      },
     }),
     {
       name: 'auth-storage',
-      getStorage: () => localStorage,
+      storage: localStorage,  // 🔧 Cambiado de getStorage a storage
       partialize: (state) => ({ token: state.token, user: state.user }),
     }
   )
@@ -136,8 +134,14 @@ function useAuth() {
     error,
     login, 
     logout, 
-    checkAuth 
+    checkAuth,
+    init
   } = useAuthStore();
+
+  // 🔧 CORRECCIÓN: Inicializar la autenticación al montar el hook
+  useEffect(() => {
+    init();
+  }, []);
 
   return {
     user,

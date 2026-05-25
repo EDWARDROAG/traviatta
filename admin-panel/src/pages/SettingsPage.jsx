@@ -459,11 +459,11 @@ function SettingsPage() {
                 name="whatsapp_number"
                 value={settings.whatsapp_number}
                 onChange={handleSettingsChange}
-                placeholder="573001112233"
+                placeholder="3184990637"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
               <p className="text-sm text-gray-500 mt-1">
-                Incluye el código del país sin el símbolo + (ej: 573001112233)
+                Incluye el código del país sin el símbolo + (ej: 3184990637)
               </p>
             </div>
 

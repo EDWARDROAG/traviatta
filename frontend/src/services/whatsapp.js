@@ -177,15 +177,16 @@ const sendWhatsAppMessage = (phoneNumber, message) => {
  * @returns {boolean} True si se pudo enviar
  */
 const sendOrderToWhatsApp = (orderData) => {
-  const { branch_whatsapp, ...orderDetails } = orderData;
-  
-  if (!branch_whatsapp) {
+  const { branch_whatsapp, branch_phone, ...orderDetails } = orderData;
+  const restaurantNumber = branch_whatsapp || branch_phone;
+
+  if (!restaurantNumber) {
     console.error('WhatsApp number not configured for this branch');
     return false;
   }
   
   const message = generateOrderMessage(orderDetails);
-  return sendWhatsAppMessage(branch_whatsapp, message);
+  return sendWhatsAppMessage(restaurantNumber, message);
 };
 
 /**

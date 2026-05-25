@@ -2,41 +2,20 @@
  * ======================================================
  * ARCHIVO: MenuPage.jsx
  * UBICACIÓN: menu-qr-system/frontend/src/pages/MenuPage.jsx
- * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 13:15
+ * FASE: F1 - DEBUG
+ * VERSIÓN: 1.2-DEBUG
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 17:30
  *
  * 🎯 PROPÓSITO:
  * Página principal que muestra el menú completo del
- * restaurante. Incluye categorías, lista de productos,
- * carrito flotante y estado de carga.
+ * restaurante. VERSIÓN CON LOGS PARA DEBUG.
  *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- * - react-router-dom: Navegación
- * - ../hooks/useMenu: Hook para obtener menú
- * - ../hooks/useCart: Hook para manejo de carrito
- * - ../components/ProductCard: Tarjeta de producto
- * - ../components/CategoryTabs: Pestañas de categorías
- * - ../components/CartFloating: Carrito flotante
- *
- * 🔗 RELACIONES:
- * - Es importado por: App.jsx
- * - Importa componentes y hooks
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-16 13:15
- *    ✅ Creación inicial del archivo
- *    ✅ Integración con hook useMenu
- *    ✅ Integración con hook useCart
- *    ✅ Renderizado de categorías y productos
- *    ✅ Carrito flotante
+ * 🐛 DEBUG ACTIVADO: SI
  * ======================================================
  */
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import useMenu from '../hooks/useMenu';
 import useCart from '../hooks/useCart';
 import ProductCard from '../components/ProductCard';
@@ -45,15 +24,32 @@ import CartFloating from '../components/CartFloating';
 
 function MenuPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const { menu, loading, error, fetchMenu } = useMenu();
   const { items, addItem, updateQuantity, removeItem, getTotal, getItemCount } = useCart();
   const [selectedCategory, setSelectedCategory] = useState(null);
 
+  // ==================================================
+  // DEBUG: LOGS DE INICIALIZACIÓN
+  // ==================================================
+  console.log('🐛 [MenuPage] Inicializado con slug:', slug);
+  console.log('🐛 [MenuPage] navigate disponible:', !!navigate);
+
   useEffect(() => {
+    console.log('🐛 [MenuPage] useEffect - fetchMenu para slug:', slug);
     fetchMenu(slug);
-  }, [slug]);
+  }, [slug, fetchMenu]);
+
+  // ==================================================
+  // DEBUG: LOGS DE ESTADO DEL CARRITO
+  // ==================================================
+  useEffect(() => {
+    console.log('🐛 [MenuPage] Carrito actualizado - Items:', getItemCount());
+    console.log('🐛 [MenuPage] Items detalle:', items);
+  }, [items, getItemCount]);
 
   if (loading) {
+    console.log('🐛 [MenuPage] Estado: CARGANDO...');
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -65,6 +61,7 @@ function MenuPage() {
   }
 
   if (error) {
+    console.error('🐛 [MenuPage] Estado: ERROR -', error);
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -80,15 +77,55 @@ function MenuPage() {
     );
   }
 
-  if (!menu) return null;
+  if (!menu) {
+    console.log('🐛 [MenuPage] Estado: SIN MENÚ (null)');
+    return null;
+  }
+
+  console.log('🐛 [MenuPage] Estado: MENÚ CARGADO');
+  console.log('🐛 [MenuPage] menu.branch:', menu.branch);
 
   const categories = menu.categories || [];
   const displayCategories = selectedCategory
     ? categories.filter(c => c.id === selectedCategory)
     : categories;
 
+  // Preparar datos de la sucursal para el checkout
+  const branchData = {
+    id: menu.branch?.id,
+    name: menu.branch?.name,
+    whatsapp_number: menu.branch?.whatsapp_number || menu.branch?.phone,
+    phone: menu.branch?.phone,
+    slug: slug,
+    requires_delivery_address: menu.branch?.requires_delivery_address ?? true,
+  };
+
+  console.log('🐛 [MenuPage] branchData preparado:', branchData);
+
+  // ==================================================
+  // FUNCIÓN DE CHECKOUT CON LOGS
+  // ==================================================
+  const handleCheckout = () => {
+    console.log('🐛 [MenuPage] 🔴🔴🔴 CLIC EN IR A PAGAR 🔴🔴🔴');
+    console.log('🐛 [MenuPage] branchData a enviar:', branchData);
+    console.log('🐛 [MenuPage] Items en carrito:', items.length);
+    console.log('🐛 [MenuPage] Navegando a /checkout...');
+    
+    try {
+      navigate('/checkout', { state: { branch: branchData } });
+      console.log('🐛 [MenuPage] ✅ navigate ejecutado correctamente');
+    } catch (err) {
+      console.error('🐛 [MenuPage] ❌ Error en navigate:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* BANNER DEBUG - VISIBLE SOLO EN DESARROLLO */}
+      <div className="bg-yellow-100 text-yellow-800 text-xs text-center py-1 sticky top-0 z-20">
+        🐛 MODO DEBUG ACTIVADO | Items: {getItemCount()} | Branch ID: {branchData.id || 'NO ID'}
+      </div>
+
       {/* Header con logo */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
@@ -144,6 +181,7 @@ function MenuPage() {
           items={items}
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
+          onCheckout={handleCheckout}
         />
       )}
     </div>

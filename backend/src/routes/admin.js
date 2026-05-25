@@ -3,39 +3,28 @@
  * ARCHIVO: admin.js
  * UBICACIÓN: menu-qr-system/backend/src/routes/admin.js
  * FASE: F2
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 04:30
+ * VERSIÓN: 1.3
+ * ÚLTIMA ACTUALIZACIÓN: 2026-05-23 12:45
  *
  * 🎯 PROPÓSITO:
  * Definición de todas las rutas administrativas de la API
- * que requieren autenticación JWT. Incluye endpoints para
- * gestión de productos, categorías, sedes, mesas, pedidos
- * y configuración del restaurante.
- *
- * 📦 DEPENDENCIAS:
- * - express: Framework web
- * - ../controllers/admin/*: Controladores administrativos
- * - ../middleware/auth: Autenticación JWT
- * - ../middleware/rateLimit: Rate limiting por tenant
- * - ../middleware/cache: Invalidación de caché
- * - ../middleware/validation: Validación de datos
- * - multer: Subida de archivos (imágenes)
- *
- * 🔗 RELACIONES:
- * - Importa de: express, ../controllers/*, ../middleware/*
- * - Es importado por: ../app.js
+ * que requieren autenticación JWT.
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.3 - 2026-05-23 12:45
+ *    ✅ Agregada ruta GET /admin/categories
+ * ------------------------------------------------------
+ * 1.2 - 2026-05-23 11:50
+ *    ✅ Agregadas rutas /orders/top-products
+ *    ✅ Agregadas rutas /orders/recent
+ *    ✅ Agregada ruta /tables/occupancy
+ * ------------------------------------------------------
+ * 1.1 - 2024-05-23 14:00
+ *    ✅ Agregada ruta GET /admin/orders/stats
+ * ------------------------------------------------------
  * 1.0 - 2024-01-16 04:30
  *    ✅ Creación inicial del archivo
- *    ✅ Rutas de autenticación (login, register, logout)
- *    ✅ Rutas de gestión de productos
- *    ✅ Rutas de gestión de categorías
- *    ✅ Rutas de gestión de sedes
- *    ✅ Rutas de gestión de mesas
- *    ✅ Rutas de gestión de pedidos
- *    ✅ Rutas de configuración
  * ======================================================
  */
 
@@ -54,6 +43,7 @@ const branchController = require('../controllers/admin/branchController');
 const tableController = require('../controllers/admin/tableController');
 const orderController = require('../controllers/admin/orderController');
 const settingsController = require('../controllers/admin/settingsController');
+const dashboardController = require('../controllers/admin/dashboardController');
 
 // Middleware
 const { authMiddleware, requireOwner } = require('../middleware/auth');
@@ -128,6 +118,24 @@ router.post('/auth/reset-password', authController.resetPassword);
  */
 router.get('/auth/verify', authMiddleware, authController.verify);
 
+/**
+ * GET /admin/dashboard/stats
+ * Estadísticas generales del panel (por restaurante)
+ */
+router.get('/dashboard/stats', authMiddleware, adminLimiter, dashboardController.getStats);
+
+/**
+ * GET /admin/dashboard/revenue
+ * Ingresos por período
+ */
+router.get('/dashboard/revenue', authMiddleware, adminLimiter, dashboardController.getRevenue);
+
+/**
+ * GET /admin/dashboard/top-products
+ * Productos más vendidos agregados por tenant
+ */
+router.get('/dashboard/top-products', authMiddleware, adminLimiter, dashboardController.getTopProducts);
+
 // ======================================================
 // RUTAS DE PRODUCTOS (requieren autenticación)
 // ======================================================
@@ -197,6 +205,12 @@ router.post('/products/:productId/duplicate', adminLimiter, productController.du
 // ======================================================
 // RUTAS DE CATEGORÍAS
 // ======================================================
+
+/**
+ * 🔧 NUEVA RUTA: GET /admin/categories
+ * Obtiene todas las categorías del restaurante (sin branch_id)
+ */
+router.get('/categories', adminLimiter, categoryController.getAllCategories);
 
 /**
  * GET /admin/branch/:branchId/categories
@@ -409,28 +423,40 @@ router.post('/branch/:branchId/tables/release-all', adminLimiter, tableControlle
 // ======================================================
 
 /**
+ * 🔧 IMPORTANTE: Las rutas específicas DEBEN ir antes que las rutas con parámetros dinámicos
+ */
+
+// RUTAS ESPECÍFICAS (sin parámetros dinámicos)
+/**
+ * GET /admin/orders/stats
+ * Obtiene estadísticas globales de pedidos para el dashboard (sin branch_id)
+ */
+router.get('/orders/stats', adminLimiter, orderController.getGlobalOrderStats);
+
+/**
+ * GET /admin/orders/top-products
+ * Obtiene los productos más vendidos
+ */
+router.get('/orders/top-products', adminLimiter, orderController.getTopProducts);
+
+/**
+ * GET /admin/orders/recent
+ * Obtiene pedidos recientes
+ */
+router.get('/orders/recent', adminLimiter, orderController.getRecentOrders);
+
+/**
  * GET /admin/orders
  * Obtiene todos los pedidos con paginación
  */
 router.get('/orders', adminLimiter, orderController.getAllOrders);
 
+// RUTAS CON PARÁMETROS DINÁMICOS (van después)
 /**
  * GET /admin/orders/:orderId
  * Obtiene un pedido por ID
  */
 router.get('/orders/:orderId', adminLimiter, orderController.getOrderById);
-
-/**
- * GET /admin/branch/:branchId/orders
- * Obtiene pedidos por sede
- */
-router.get('/branch/:branchId/orders', adminLimiter, orderController.getOrdersByBranch);
-
-/**
- * GET /admin/branch/:branchId/orders/stats
- * Obtiene estadísticas de pedidos
- */
-router.get('/branch/:branchId/orders/stats', adminLimiter, orderController.getOrderStats);
 
 /**
  * PUT /admin/orders/:orderId/status
@@ -449,6 +475,28 @@ router.put('/orders/:orderId/payment-status', adminLimiter, orderController.upda
  * Asigna un pedido a una mesa
  */
 router.post('/orders/:orderId/assign-table', adminLimiter, orderController.assignOrderToTable);
+
+/**
+ * GET /admin/branch/:branchId/orders
+ * Obtiene pedidos por sede
+ */
+router.get('/branch/:branchId/orders', adminLimiter, orderController.getOrdersByBranch);
+
+/**
+ * GET /admin/branch/:branchId/orders/stats
+ * Obtiene estadísticas de pedidos por sede
+ */
+router.get('/branch/:branchId/orders/stats', adminLimiter, orderController.getOrderStats);
+
+// ======================================================
+// RUTAS DE TABLES (ADMIN) - ENDPOINTS ADICIONALES
+// ======================================================
+
+/**
+ * GET /admin/tables/occupancy
+ * Obtiene ocupación de mesas (todas las sedes del tenant)
+ */
+router.get('/tables/occupancy', adminLimiter, tableController.getOccupancyStats);
 
 // ======================================================
 // RUTAS DE CONFIGURACIÓN

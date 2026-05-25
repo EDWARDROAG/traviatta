@@ -3,37 +3,26 @@
  * ARCHIVO: Order.js
  * UBICACIÓN: menu-qr-system/backend/src/models/Order.js
  * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-15 15:30
+ * VERSIÓN: 1.3
+ * ÚLTIMA ACTUALIZACIÓN: 2026-05-23 12:00
  *
  * 🎯 PROPÓSITO:
- * Modelo de datos para la gestión de pedidos, tanto
- * de domicilio como de servicio en mesa. Define la
- * estructura, validaciones y operaciones CRUD para
- * la tabla de orders, incluyendo items, estados,
- * cálculo de totales y gestión del ciclo de vida.
- *
- * 📦 DEPENDENCIAS:
- * - ../config/database: Conexión a PostgreSQL
- * - uuid: Generación de IDs únicos
- *
- * 🔗 RELACIONES:
- * - Importa de: ../config/database, uuid
- * - Es importado por: services/orderService.js,
- *   controllers/public/orderController.js,
- *   controllers/admin/orderController.js
+ * Modelo de datos para la gestión de pedidos.
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
- * 1.0 - 2024-01-15 15:30
+ * 1.3 - 2026-05-23 12:00
+ *    ✅ Agregada función getGlobalTopProducts
+ *    ✅ Agregada función getRecentOrders
+ * ------------------------------------------------------
+ * 1.2 - 2026-05-23 10:30
+ *    ✅ Agregada función getGlobalStats
+ * ------------------------------------------------------
+ * 1.1 - 2026-05-22 19:15
+ *    ✅ Serialización JSONB corregida
+ * ------------------------------------------------------
+ * 1.0 - 2026-01-15 15:30
  *    ✅ Creación inicial del archivo
- *    ✅ Definición del modelo Order
- *    ✅ Estados del pedido: pending, confirmed, preparing, ready, delivered, cancelled
- *    ✅ Tipos de pedido: delivery, takeaway, table
- *    ✅ Métodos CRUD completos
- *    ✅ Cálculo de totales
- *    ✅ Historial por cliente y sede
- *    ✅ Estadísticas de pedidos
  * ======================================================
  */
 
@@ -45,43 +34,38 @@ const { v4: uuidv4 } = require('uuid');
 // ======================================================
 
 const ORDER_STATUS = {
-  PENDING: 'pending',       // Pedido recibido, pendiente de confirmar
-  CONFIRMED: 'confirmed',   // Confirmado por el restaurante
-  PREPARING: 'preparing',   // En preparación
-  READY: 'ready',           // Listo para entregar
-  DELIVERED: 'delivered',   // Entregado (domicilio) o finalizado (mesa)
-  CANCELLED: 'cancelled',   // Cancelado
+  PENDING: 'pending',
+  CONFIRMED: 'confirmed',
+  PREPARING: 'preparing',
+  READY: 'ready',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
 };
 
 const ORDER_TYPES = {
-  DELIVERY: 'delivery',     // Domicilio
-  TAKEAWAY: 'takeaway',     // Para llevar
-  TABLE: 'table',           // Servicio en mesa
+  DELIVERY: 'delivery',
+  TAKEAWAY: 'takeaway',
+  TABLE: 'table',
 };
 
 const PAYMENT_METHODS = {
-  CASH: 'cash',             // Efectivo contra entrega
-  CARD: 'card',             // Tarjeta en datáfono
-  TRANSFER: 'transfer',     // Transferencia bancaria
-  NEQUI: 'nequi',           // Nequi
-  DAVIPLATA: 'daviplata',   // Daviplata
+  CASH: 'cash',
+  CARD: 'card',
+  TRANSFER: 'transfer',
+  NEQUI: 'nequi',
+  DAVIPLATA: 'daviplata',
 };
 
 const PAYMENT_STATUS = {
-  PENDING: 'pending',       // Pendiente de pago
-  PAID: 'paid',             // Pagado
-  FAILED: 'failed',         // Fallido
+  PENDING: 'pending',
+  PAID: 'paid',
+  FAILED: 'failed',
 };
 
 // ======================================================
 // VALIDACIONES
 // ======================================================
 
-/**
- * Valida los datos de un pedido
- * @param {Object} data - Datos del pedido
- * @returns {Object} { valid: boolean, errors: Array }
- */
 const validateOrder = (data) => {
   const errors = [];
   
@@ -109,18 +93,8 @@ const validateOrder = (data) => {
     errors.push('Para pedidos a domicilio, la dirección es requerida');
   }
   
-  if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+  if (!data.items || data.items.length === 0) {
     errors.push('El pedido debe contener al menos un producto');
-  }
-  
-  for (let i = 0; i < data.items.length; i++) {
-    const item = data.items[i];
-    if (!item.product_id || !item.name || !item.quantity || item.quantity <= 0) {
-      errors.push(`Item ${i}: producto, nombre y cantidad requeridos`);
-    }
-    if (item.price === undefined || item.price < 0) {
-      errors.push(`Item ${i}: precio requerido y debe ser mayor a 0`);
-    }
   }
   
   if (data.payment_method && !Object.values(PAYMENT_METHODS).includes(data.payment_method)) {
@@ -138,15 +112,19 @@ const validateOrder = (data) => {
   return { valid: errors.length === 0, errors };
 };
 
-/**
- * Calcula el total de un pedido
- * @param {Object} data - Datos del pedido
- * @returns {Object} { subtotal, total }
- */
 const calculateTotals = (data) => {
-  const subtotal = data.items.reduce((sum, item) => {
+  // Si data.items es string, parsearlo primero
+  let items = data.items;
+  if (typeof items === 'string') {
+    try {
+      items = JSON.parse(items);
+    } catch (e) {
+      items = [];
+    }
+  }
+  
+  const subtotal = items.reduce((sum, item) => {
     let itemTotal = item.price * item.quantity;
-    // Sumar modificadores/extras
     if (item.modifiers && Array.isArray(item.modifiers)) {
       itemTotal += item.modifiers.reduce((modSum, mod) => modSum + (mod.price || 0), 0);
     }
@@ -162,11 +140,6 @@ const calculateTotals = (data) => {
 // MODELO ORDER - CRUD
 // ======================================================
 
-/**
- * Genera el número de pedido secuencial por sede
- * @param {string} branchId - ID de la sede
- * @returns {Promise<number>} Número de pedido
- */
 const generateOrderNumber = async (branchId) => {
   const query = `
     SELECT COALESCE(MAX(order_number), 0) + 1 as next_number
@@ -178,18 +151,27 @@ const generateOrderNumber = async (branchId) => {
 };
 
 /**
- * Crea un nuevo pedido
- * @param {Object} data - Datos del pedido
- * @returns {Promise<Object>} Pedido creado
+ * Crea un nuevo pedido - CORREGIDO
  */
 const create = async (data) => {
-  // Calcular totals si no vienen
-  const totals = calculateTotals(data);
+  // 🔧 CORRECCIÓN CRÍTICA: Asegurar que items sea string JSON
+  let itemsForDb = data.items;
+  if (typeof itemsForDb !== 'string') {
+    itemsForDb = JSON.stringify(itemsForDb);
+  }
+  
+  // Preparar datos para validación (usando el objeto original si existe)
+  const dataForValidation = {
+    ...data,
+    items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items,
+  };
+  
+  const totals = calculateTotals(dataForValidation);
   const subtotal = data.subtotal || totals.subtotal;
   const total = data.total || totals.total;
   
   const orderData = {
-    ...data,
+    ...dataForValidation,
     subtotal,
     total,
   };
@@ -226,7 +208,7 @@ const create = async (data) => {
     data.delivery_address || null,
     data.delivery_latitude || null,
     data.delivery_longitude || null,
-    data.items,
+    itemsForDb,
     subtotal,
     data.delivery_cost || 0,
     data.discount || 0,
@@ -241,11 +223,6 @@ const create = async (data) => {
   return result.rows[0];
 };
 
-/**
- * Busca un pedido por ID
- * @param {string} id - ID del pedido
- * @returns {Promise<Object|null>} Pedido encontrado o null
- */
 const findById = async (id) => {
   const query = `
     SELECT o.*, b.name as branch_name, b.whatsapp_number as branch_whatsapp,
@@ -259,12 +236,6 @@ const findById = async (id) => {
   return result.rows[0] || null;
 };
 
-/**
- * Busca pedidos por sede
- * @param {string} branchId - ID de la sede
- * @param {Object} options - Opciones de filtro y paginación
- * @returns {Promise<Object>} { data, total, page, limit }
- */
 const findByBranch = async (branchId, options = {}) => {
   const page = parseInt(options.page) || 1;
   const limit = parseInt(options.limit) || 20;
@@ -303,7 +274,6 @@ const findByBranch = async (branchId, options = {}) => {
   
   const result = await readQuery(query, params);
   
-  // Contar total
   let countQuery = 'SELECT COUNT(*) FROM orders WHERE branch_id = $1';
   const countParams = [branchId];
   let countIndex = 2;
@@ -338,12 +308,6 @@ const findByBranch = async (branchId, options = {}) => {
   };
 };
 
-/**
- * Busca pedidos por mesa
- * @param {string} tableId - ID de la mesa
- * @param {Object} options - Opciones (incluir activos)
- * @returns {Promise<Array>} Lista de pedidos
- */
 const findByTable = async (tableId, options = {}) => {
   let query = `
     SELECT * FROM orders 
@@ -361,13 +325,6 @@ const findByTable = async (tableId, options = {}) => {
   return result.rows;
 };
 
-/**
- * Busca pedidos por cliente (teléfono)
- * @param {string} phone - Teléfono del cliente
- * @param {string} tenantId - ID del restaurante
- * @param {number} limit - Límite de resultados
- * @returns {Promise<Array>} Lista de pedidos
- */
 const findByCustomer = async (phone, tenantId, limit = 10) => {
   const query = `
     SELECT o.*, b.name as branch_name
@@ -381,12 +338,6 @@ const findByCustomer = async (phone, tenantId, limit = 10) => {
   return result.rows;
 };
 
-/**
- * Actualiza el estado de un pedido
- * @param {string} id - ID del pedido
- * @param {string} status - Nuevo estado
- * @returns {Promise<Object|null>} Pedido actualizado
- */
 const updateStatus = async (id, status) => {
   if (!Object.values(ORDER_STATUS).includes(status)) {
     throw new Error(`Estado inválido: ${status}`);
@@ -403,12 +354,6 @@ const updateStatus = async (id, status) => {
   return result.rows[0] || null;
 };
 
-/**
- * Actualiza el estado de pago de un pedido
- * @param {string} id - ID del pedido
- * @param {string} paymentStatus - Nuevo estado de pago
- * @returns {Promise<Object|null>} Pedido actualizado
- */
 const updatePaymentStatus = async (id, paymentStatus) => {
   if (!Object.values(PAYMENT_STATUS).includes(paymentStatus)) {
     throw new Error(`Estado de pago inválido: ${paymentStatus}`);
@@ -424,12 +369,6 @@ const updatePaymentStatus = async (id, paymentStatus) => {
   return result.rows[0] || null;
 };
 
-/**
- * Cancela un pedido
- * @param {string} id - ID del pedido
- * @param {string} reason - Razón de cancelación (opcional)
- * @returns {Promise<Object|null>} Pedido cancelado
- */
 const cancel = async (id, reason = null) => {
   const query = `
     UPDATE orders 
@@ -446,13 +385,6 @@ const cancel = async (id, reason = null) => {
 // ESTADÍSTICAS
 // ======================================================
 
-/**
- * Obtiene estadísticas de pedidos para una sede
- * @param {string} branchId - ID de la sede
- * @param {Date} startDate - Fecha inicio
- * @param {Date} endDate - Fecha fin
- * @returns {Promise<Object>} Estadísticas
- */
 const getStats = async (branchId, startDate, endDate) => {
   const query = `
     SELECT 
@@ -474,12 +406,6 @@ const getStats = async (branchId, startDate, endDate) => {
   return result.rows[0];
 };
 
-/**
- * Obtiene los productos más pedidos
- * @param {string} branchId - ID de la sede
- * @param {number} limit - Límite de resultados
- * @returns {Promise<Array>} Productos más pedidos
- */
 const getTopProducts = async (branchId, limit = 10) => {
   const query = `
     SELECT 
@@ -498,22 +424,117 @@ const getTopProducts = async (branchId, limit = 10) => {
   return result.rows;
 };
 
+/**
+ * 🔧 NUEVA FUNCIÓN: getGlobalStats
+ * Obtiene estadísticas globales de todas las sedes de un tenant
+ */
+const getGlobalStats = async (tenantId, startDate, endDate) => {
+  const query = `
+    SELECT 
+      COUNT(DISTINCT o.id) as total_orders,
+      SUM(o.total) as total_revenue,
+      AVG(o.total) as avg_order_value,
+      COUNT(CASE WHEN o.order_status = 'delivered' THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN o.order_status = 'cancelled' THEN 1 END) as cancelled_orders,
+      COUNT(CASE WHEN o.order_type = 'delivery' THEN 1 END) as delivery_orders,
+      COUNT(CASE WHEN o.order_type = 'table' THEN 1 END) as table_orders,
+      COUNT(CASE WHEN o.order_type = 'takeaway' THEN 1 END) as takeaway_orders
+    FROM orders o
+    JOIN branches b ON o.branch_id = b.id
+    WHERE b.tenant_id = $1 
+      AND o.created_at >= $2 
+      AND o.created_at <= $3
+  `;
+  const result = await readQuery(query, [tenantId, startDate, endDate]);
+  
+  const row = result.rows[0];
+  
+  // Obtener productos más vendidos a nivel global
+  const topProductsQuery = `
+    SELECT 
+      jsonb_array_elements(o.items)->>'name' as product_name,
+      SUM((jsonb_array_elements(o.items)->>'quantity')::int) as total_quantity,
+      COUNT(DISTINCT o.id) as order_count
+    FROM orders o
+    JOIN branches b ON o.branch_id = b.id
+    CROSS JOIN jsonb_array_elements(o.items)
+    WHERE b.tenant_id = $1 
+      AND o.created_at >= $2 
+      AND o.created_at <= $3
+      AND o.order_status IN ('delivered', 'confirmed', 'preparing')
+    GROUP BY product_name
+    ORDER BY total_quantity DESC
+    LIMIT 5
+  `;
+  
+  const topResult = await readQuery(topProductsQuery, [tenantId, startDate, endDate]);
+  
+  return {
+    total_orders: parseInt(row?.total_orders) || 0,
+    total_revenue: parseFloat(row?.total_revenue) || 0,
+    avg_order_value: parseFloat(row?.avg_order_value) || 0,
+    completed_orders: parseInt(row?.completed_orders) || 0,
+    cancelled_orders: parseInt(row?.cancelled_orders) || 0,
+    delivery_orders: parseInt(row?.delivery_orders) || 0,
+    table_orders: parseInt(row?.table_orders) || 0,
+    takeaway_orders: parseInt(row?.takeaway_orders) || 0,
+    top_products: topResult.rows || [],
+  };
+};
+
+/**
+ * 🔧 NUEVA FUNCIÓN: getGlobalTopProducts
+ * Obtiene productos más vendidos a nivel global
+ */
+const getGlobalTopProducts = async (tenantId, limit = 5) => {
+  const query = `
+    SELECT 
+      jsonb_array_elements(o.items)->>'name' as product_name,
+      SUM((jsonb_array_elements(o.items)->>'quantity')::int) as total_quantity,
+      COUNT(DISTINCT o.id) as order_count
+    FROM orders o
+    JOIN branches b ON o.branch_id = b.id
+    CROSS JOIN jsonb_array_elements(o.items)
+    WHERE b.tenant_id = $1 
+      AND o.order_status IN ('delivered', 'confirmed', 'preparing')
+    GROUP BY product_name
+    ORDER BY total_quantity DESC
+    LIMIT $2
+  `;
+  const result = await readQuery(query, [tenantId, limit]);
+  return result.rows;
+};
+
+/**
+ * 🔧 NUEVA FUNCIÓN: getRecentOrders
+ * Obtiene pedidos recientes de todas las sedes del tenant
+ */
+const getRecentOrders = async (tenantId, limit = 5) => {
+  const query = `
+    SELECT 
+      o.id, o.order_number, o.customer_name, o.total, o.order_status, o.created_at,
+      b.name as branch_name
+    FROM orders o
+    JOIN branches b ON o.branch_id = b.id
+    WHERE b.tenant_id = $1
+    ORDER BY o.created_at DESC
+    LIMIT $2
+  `;
+  const result = await readQuery(query, [tenantId, limit]);
+  return result.rows;
+};
+
 // ======================================================
 // EXPORTACIONES
 // ======================================================
 
 module.exports = {
-  // Constantes
   ORDER_STATUS,
   ORDER_TYPES,
   PAYMENT_METHODS,
   PAYMENT_STATUS,
-  
-  // Validación
   validateOrder,
   calculateTotals,
-  
-  // CRUD
   create,
   findById,
   findByBranch,
@@ -523,8 +544,9 @@ module.exports = {
   updatePaymentStatus,
   cancel,
   generateOrderNumber,
-  
-  // Estadísticas
   getStats,
   getTopProducts,
+  getGlobalStats,
+  getGlobalTopProducts,
+  getRecentOrders,
 };

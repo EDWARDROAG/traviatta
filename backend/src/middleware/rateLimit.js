@@ -3,8 +3,8 @@
  * ARCHIVO: rateLimit.js
  * UBICACIÓN: menu-qr-system/backend/src/middleware/rateLimit.js
  * FASE: F5
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 02:00
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-21 14:45
  *
  * 🎯 PROPÓSITO:
  * Middleware de rate limiting para proteger la API
@@ -24,19 +24,16 @@
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.1 - 2024-05-21 14:45
+ *    ✅ Corregida importación de RedisStore para versiones modernas
+ * ------------------------------------------------------
  * 1.0 - 2024-01-16 02:00
  *    ✅ Creación inicial del archivo
- *    ✅ Rate limiter general por IP
- *    ✅ Rate limiter por tenant (restaurante)
- *    ✅ Rate limiter estricto para endpoints críticos
- *    ✅ Limiter para login/autenticación
- *    ✅ Limiter para creación de pedidos
- *    ✅ Headers de rate limit en respuestas
  * ======================================================
  */
 
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
+const { RedisStore } = require('rate-limit-redis');
 const redis = require('../config/redis');
 
 // ======================================================
@@ -78,19 +75,16 @@ const redisClient = redis.client;
  * 100 peticiones por minuto por IP
  */
 const generalLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-  }),
-  windowMs: 60 * 1000, // 1 minuto
-  max: 100, // 100 peticiones por minuto
+  windowMs: 60 * 1000,
+  max: 100,
   message: {
     success: false,
     error: 'Demasiadas peticiones. Por favor espera un momento.',
     timestamp: new Date().toISOString(),
   },
-  standardHeaders: true, // Retornar headers `RateLimit-*`
-  legacyHeaders: false, // Deshabilitar headers `X-RateLimit-*`
-  skipSuccessfulRequests: false, // Contar todas las peticiones
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
 });
 
 // ======================================================
@@ -102,10 +96,6 @@ const generalLimiter = rateLimit({
  * 500 peticiones por minuto por tenant
  */
 const tenantLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:tenant:',
-  }),
   windowMs: 60 * 1000,
   max: 500,
   keyGenerator: (req) => getTenantIdentifier(req),
@@ -127,10 +117,6 @@ const tenantLimiter = rateLimit({
  * 20 peticiones por minuto por IP
  */
 const strictLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:strict:',
-  }),
   windowMs: 60 * 1000,
   max: 20,
   message: {
@@ -152,13 +138,9 @@ const strictLimiter = rateLimit({
  * 5 intentos por 15 minutos por IP (protección contra fuerza bruta)
  */
 const loginLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:login:',
-  }),
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // 5 intentos
-  skipSuccessfulRequests: true, // No contar intentos exitosos
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
   message: {
     success: false,
     error: 'Demasiados intentos de inicio de sesión. Por favor intenta más tarde.',
@@ -177,10 +159,6 @@ const loginLimiter = rateLimit({
  * 10 pedidos por minuto por IP
  */
 const orderLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:order:',
-  }),
   windowMs: 60 * 1000,
   max: 10,
   message: {
@@ -201,11 +179,7 @@ const orderLimiter = rateLimit({
  * 3 registros por hora por IP
  */
 const registerLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:register:',
-  }),
-  windowMs: 60 * 60 * 1000, // 1 hora
+  windowMs: 60 * 60 * 1000,
   max: 3,
   message: {
     success: false,
@@ -225,10 +199,6 @@ const registerLimiter = rateLimit({
  * 200 peticiones por minuto por IP
  */
 const publicApiLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:public:',
-  }),
   windowMs: 60 * 1000,
   max: 200,
   message: {
@@ -250,10 +220,6 @@ const publicApiLimiter = rateLimit({
  * 300 peticiones por minuto por tenant
  */
 const adminLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:admin:',
-  }),
   windowMs: 60 * 1000,
   max: 300,
   keyGenerator: (req) => getTenantIdentifier(req),
@@ -275,10 +241,6 @@ const adminLimiter = rateLimit({
  * 1000 peticiones por minuto por IP
  */
 const webhookLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-    prefix: 'rl:webhook:',
-  }),
   windowMs: 60 * 1000,
   max: 1000,
   message: {
@@ -304,17 +266,12 @@ const createCustomLimiter = (options) => {
   const {
     windowMs = 60 * 1000,
     max = 100,
-    prefix = 'rl:custom:',
     keyGenerator = (req) => req.ip || req.connection.remoteAddress,
     message = 'Demasiadas peticiones. Por favor espera.',
     skipSuccessfulRequests = false,
   } = options;
   
   return rateLimit({
-    store: new RedisStore({
-      sendCommand: (...args) => redisClient.sendCommand(args),
-      prefix,
-    }),
     windowMs,
     max,
     keyGenerator,

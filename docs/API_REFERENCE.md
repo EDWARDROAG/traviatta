@@ -103,7 +103,7 @@ Obtiene el menú completo de un restaurante.
       "id": "uuid",
       "name": "El Sabor Costeño",
       "logo_url": "https://cloudinary.com/...",
-      "whatsapp_number": "573001112233",
+      "whatsapp_number": "3184990637",
       "is_open": true
     },
     "modules": [
@@ -356,7 +356,7 @@ json
   "name": "Sede Norte",
   "address": "Calle 123",
   "phone": "1234567",
-  "whatsapp_number": "573001112233",
+  "whatsapp_number": "3184990637",
   "delivery_cost": 3000,
   "free_delivery_min_amount": 30000
 }
@@ -455,7 +455,7 @@ Actualiza configuración general.
 json
 {
   "name": "Mi Restaurante",
-  "whatsapp_number": "573001112233",
+  "whatsapp_number": "3184990637",
   "primary_color": "#FF6B35"
 }
 POST /admin/settings/logo

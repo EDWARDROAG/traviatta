@@ -32,6 +32,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import api from '../services/api';
+import { getFallbackMenu } from '../data/staticMenus';
 
 // Caché simple en memoria
 const menuCache = new Map();
@@ -58,6 +59,19 @@ function useMenu() {
       } else {
         menuCache.delete(cacheKey);
       }
+    }
+
+    // Retornar menú estático para Traviatta antes de llamar al backend
+    const fallbackMenu = getFallbackMenu(slug);
+    if (fallbackMenu) {
+      setMenu(fallbackMenu);
+      setError(null);
+      menuCache.set(cacheKey, {
+        data: fallbackMenu,
+        timestamp: Date.now(),
+      });
+      setLoading(false);
+      return fallbackMenu;
     }
     
     // Cancelar petición anterior si existe
@@ -103,10 +117,23 @@ function useMenu() {
         throw new Error(response.data.error || 'Error al cargar el menú');
       }
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        setError(err.message);
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.message === 'canceled') {
         return null;
       }
+
+      const fallbackMenu = getFallbackMenu(slug);
+      if (fallbackMenu) {
+        setMenu(fallbackMenu);
+        setError(null);
+        menuCache.set(cacheKey, {
+          data: fallbackMenu,
+          timestamp: Date.now(),
+        });
+        return fallbackMenu;
+      }
+
+      setError(err.message);
+      return null;
     } finally {
       setLoading(false);
       if (abortControllerRef.current === abortController) {

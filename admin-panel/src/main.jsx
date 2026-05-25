@@ -3,32 +3,21 @@
  * ARCHIVO: main.jsx
  * UBICACIÓN: menu-qr-system/admin-panel/src/main.jsx
  * FASE: F2
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 19:00
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 20:30
  *
  * 🎯 PROPÓSITO:
  * Punto de entrada principal del panel administrativo.
- * Renderiza el componente App en el DOM y configura
- * el enrutamiento y proveedores globales.
- *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- * - react-dom: Renderizado en DOM
- * - react-router-dom: Enrutamiento
- * - react-hot-toast: Notificaciones
- * - ./App: Componente principal
- *
- * 🔗 RELACIONES:
- * - Importado por: index.html
- * - Es el punto de entrada de React
+ * VERSIÓN CORREGIDA - Configuración future flags.
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.1 - 2024-05-22 20:30
+ *    ✅ Corregido: Añadidos future flags para React Router v7
+ *    ✅ Corregido: Configuración storage para Zustand
+ * ------------------------------------------------------
  * 1.0 - 2024-01-16 19:00
  *    ✅ Creación inicial del archivo
- *    ✅ Configuración de React Router
- *    ✅ Configuración de Toaster para notificaciones
- *    ✅ Importación de estilos globales
  * ======================================================
  */
 
@@ -41,7 +30,12 @@ import './styles/globals.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <App />
       <Toaster
         position="top-right"

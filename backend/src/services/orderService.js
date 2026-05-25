@@ -3,40 +3,15 @@
  * ARCHIVO: orderService.js
  * UBICACIÓN: menu-qr-system/backend/src/services/orderService.js
  * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-15 17:00
+ * VERSIÓN: 1.1 - CORREGIDO
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 18:55
  *
  * 🎯 PROPÓSITO:
  * Servicio principal para la gestión de pedidos.
- * Implementa creación, validación, cálculo de totales,
- * y procesamiento asíncrono mediante colas RabbitMQ.
- * También maneja notificaciones vía WhatsApp y
- * actualización de estados de pedidos y mesas.
+ * VERSIÓN CORREGIDA - Serialización JSON para PostgreSQL.
  *
- * 📦 DEPENDENCIAS:
- * - ../models/Order: Modelo de pedidos
- * - ../models/Table: Modelo de mesas
- * - ../models/Branch: Modelo de sedes
- * - ../config/rabbitmq: Cola de mensajes
- * - ../config/redis: Caché
- * - ./whatsappService: Notificaciones WhatsApp
- * - ../utils/logger: Logging
- *
- * 🔗 RELACIONES:
- * - Importa de: ../models/*, ../config/*, ./whatsappService
- * - Es importado por: controllers/public/orderController.js,
- *   controllers/admin/orderController.js
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-15 17:00
- *    ✅ Creación inicial del archivo
- *    ✅ Creación de pedidos con validación
- *    ✅ Cálculo de subtotales y totales
- *    ✅ Procesamiento asíncrono con RabbitMQ
- *    ✅ Gestión de pedidos desde mesa
- *    ✅ Actualización de estado de mesas
- *    ✅ Historial y estadísticas
+ * 🐛 CORRECCIÓN: Los items ahora se serializan correctamente
+ *    como JSONB para PostgreSQL.
  * ======================================================
  */
 
@@ -59,7 +34,7 @@ const QUEUE_OPTIONS = {
 };
 
 // ======================================================
-// FUNCIÓN PRINCIPAL - CREAR PEDIDO
+// FUNCIÓN PRINCIPAL - CREAR PEDIDO (CORREGIDA)
 // ======================================================
 
 /**
@@ -71,14 +46,20 @@ const createOrder = async (orderData) => {
   const startTime = Date.now();
   
   try {
+    logger.info('📦 [createOrder] Iniciando creación de pedido');
+    logger.info('📦 [createOrder] Datos recibidos:', JSON.stringify(orderData, null, 2));
+    
     // Validar sede
     const branch = await Branch.findById(orderData.branch_id);
     if (!branch) {
       throw new Error('Sede no encontrada');
     }
     
+    logger.info('✅ [createOrder] Sede encontrada:', branch.id, branch.name);
+    
     // Validar productos y precios
     const validatedItems = await validateProducts(orderData.items);
+    logger.info('✅ [createOrder] Productos validados:', validatedItems.length);
     
     // Calcular totales
     const subtotal = calculateSubtotal(validatedItems);
@@ -88,9 +69,21 @@ const createOrder = async (orderData) => {
     const discount = orderData.discount || 0;
     const total = subtotal + deliveryCost - discount;
     
-    // Construir pedido
+    logger.info('💰 [createOrder] Totales - Subtotal:', subtotal, 'Delivery:', deliveryCost, 'Total:', total);
+    
+    // ==================================================
+    // 🔧 CORRECCIÓN CRÍTICA: Convertir items a JSONB
+    // ==================================================
+    // PostgreSQL espera el campo 'items' como JSONB.
+    // Convertimos el array de objetos a un string JSON.
+    const itemsForDatabase = JSON.stringify(validatedItems);
+    
+    // Obtener tenant_id de la sede
+    const tenantId = branch.tenant_id;
+    
+    // Construir pedido para la base de datos
     const orderPayload = {
-      tenant_id: branch.tenant_id,
+      tenant_id: tenantId,
       branch_id: orderData.branch_id,
       table_id: null,
       order_type: orderData.order_type || Order.ORDER_TYPES.DELIVERY,
@@ -100,7 +93,7 @@ const createOrder = async (orderData) => {
       delivery_address: orderData.delivery_address,
       delivery_latitude: orderData.delivery_latitude,
       delivery_longitude: orderData.delivery_longitude,
-      items: validatedItems,
+      items: itemsForDatabase,  // 🔧 String JSON, no objeto
       subtotal,
       delivery_cost: deliveryCost,
       discount,
@@ -109,34 +102,48 @@ const createOrder = async (orderData) => {
       notes: orderData.notes,
     };
     
+    logger.info('📝 [createOrder] Payload preparado, items serializados');
+    
     // Crear pedido en base de datos
     const order = await Order.create(orderPayload);
     
-    // Encolar para procesamiento asíncrono
+    logger.info('✅ [createOrder] Pedido creado en BD:', order.id, order.order_number);
+    
+    // Encolar para procesamiento asíncrono (usar objeto, no string)
     await rabbitmq.publishOrder({
       order_id: order.id,
       order_number: order.order_number,
-      ...orderPayload,
+      items: validatedItems,  // Para la cola usar el objeto
+      branch_id: orderData.branch_id,
+      branch_name: branch.name,
+      customer_name: orderData.customer_name,
+      delivery_address: orderData.delivery_address,
+      notes: orderData.notes,
+      payment_method: orderData.payment_method,
+      total,
     });
     
     const duration = Date.now() - startTime;
-    logger.info(`Order ${order.order_number} created and queued in ${duration}ms`);
+    logger.info(`✅ Order ${order.order_number} created and queued in ${duration}ms`);
     
     return {
       success: true,
-      order_id: order.id,
-      order_number: order.order_number,
-      total: order.total,
-      message: 'Pedido recibido. El restaurante te confirmará pronto.',
+      data: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total: order.total,
+        message: 'Pedido recibido. El restaurante te confirmará pronto.',
+      }
     };
   } catch (error) {
-    logger.error('Error creating order:', error.message);
+    logger.error('❌ Error creating order:', error.message);
+    logger.error('❌ Stack:', error.stack);
     throw error;
   }
 };
 
 // ======================================================
-// PEDIDO DESDE MESA
+// PEDIDO DESDE MESA (CORREGIDO)
 // ======================================================
 
 /**
@@ -162,6 +169,9 @@ const createTableOrder = async (tableId, orderData) => {
     const validatedItems = await validateProducts(orderData.items);
     const subtotal = calculateSubtotal(validatedItems);
     
+    // Serializar items para la BD
+    const itemsForDatabase = JSON.stringify(validatedItems);
+    
     // Crear pedido de mesa
     const orderPayload = {
       tenant_id: orderData.tenant_id,
@@ -170,7 +180,7 @@ const createTableOrder = async (tableId, orderData) => {
       order_type: Order.ORDER_TYPES.TABLE,
       customer_name: orderData.customer_name || 'Cliente en mesa',
       customer_phone: orderData.customer_phone || table.branch_phone,
-      items: validatedItems,
+      items: itemsForDatabase,  // 🔧 String JSON
       subtotal,
       delivery_cost: 0,
       discount: 0,
@@ -191,13 +201,15 @@ const createTableOrder = async (tableId, orderData) => {
       items: validatedItems,
     });
     
-    logger.info(`Table order created for table ${table.table_number}: ${order.order_number}`);
+    logger.info(`✅ Table order created for table ${table.table_number}: ${order.order_number}`);
     
     return {
       success: true,
-      order_id: order.id,
-      order_number: order.order_number,
-      total: order.total,
+      data: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total: order.total,
+      }
     };
   } catch (error) {
     logger.error('Error creating table order:', error.message);
@@ -244,7 +256,7 @@ const processOrderFromQueue = async (orderData) => {
     // Actualizar estado del pedido a confirmed
     await Order.updateStatus(order_id, Order.ORDER_STATUS.CONFIRMED);
     
-    logger.info(`Order ${order_number} processed and sent to WhatsApp`);
+    logger.info(`✅ Order ${order_number} processed and sent to WhatsApp`);
   } catch (error) {
     logger.error('Error processing order from queue:', error.message);
     throw error;
@@ -322,7 +334,6 @@ const calculateSubtotal = (items) => {
  */
 const calculateDeliveryCost = async (branch, address) => {
   // Por ahora, costo fijo o basado en configuración
-  // En versión futura, integración con geolocalización
   const deliverySettings = branch.delivery_settings || {};
   return deliverySettings.cost || 3000;
 };
@@ -344,16 +355,24 @@ const addItemsToExistingOrder = async (orderId, newItems) => {
   }
   
   const validatedNewItems = await validateProducts(newItems);
-  const existingItems = order.items;
+  
+  // Parsear items existentes (vienen como string JSON de la BD)
+  const existingItems = typeof order.items === 'string' 
+    ? JSON.parse(order.items) 
+    : order.items;
+    
   const allItems = [...existingItems, ...validatedNewItems];
   
   // Recalcular totales
   const subtotal = calculateSubtotal(allItems);
   const total = subtotal + (order.delivery_cost || 0) - (order.discount || 0);
   
+  // Serializar para la BD
+  const itemsForDatabase = JSON.stringify(allItems);
+  
   // Actualizar pedido
   const updatedOrder = await Order.update(orderId, {
-    items: allItems,
+    items: itemsForDatabase,
     subtotal,
     total,
   });
@@ -388,7 +407,7 @@ const closeTableOrder = async (orderId) => {
     await Table.changeStatus(order.table_id, Table.TABLE_STATUS.CLEANING);
   }
   
-  logger.info(`Table order ${order.order_number} closed`);
+  logger.info(`✅ Table order ${order.order_number} closed`);
   
   return updatedOrder;
 };

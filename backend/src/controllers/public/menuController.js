@@ -3,36 +3,8 @@
  * ARCHIVO: menuController.js
  * UBICACIÓN: menu-qr-system/backend/src/controllers/public/menuController.js
  * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-15 20:00
- *
- * 🎯 PROPÓSITO:
- * Controlador para las rutas públicas del menú digital.
- * Maneja la obtención del menú por slug de restaurante
- * o por ID de sede, incluyendo filtrado por horario,
- * disponibilidad de productos, y soporte para menú
- * específico de mesa.
- *
- * 📦 DEPENDENCIAS:
- * - ../../services/menuService: Lógica de menú
- * - ../../services/branchService: Gestión de sedes
- * - ../../models/Tenant: Modelo de restaurantes
- * - ../../utils/logger: Logging
- *
- * 🔗 RELACIONES:
- * - Importa de: ../../services/*, ../../models/*
- * - Es importado por: ../../routes/public.js
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-15 20:00
- *    ✅ Creación inicial del archivo
- *    ✅ Endpoint GET /:slug/menu
- *    ✅ Endpoint GET /branch/:branchId/menu
- *    ✅ Endpoint GET /table/:tableId/menu
- *    ✅ Endpoint GET /:slug/featured
- *    ✅ Endpoint GET /:slug/search
- *    ✅ Manejo de errores y respuestas consistentes
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-21 16:00
  * ======================================================
  */
 
@@ -47,12 +19,6 @@ const logger = require('../../utils/logger');
 // FUNCIONES AUXILIARES
 // ======================================================
 
-/**
- * Envía respuesta de éxito
- * @param {Object} res - Response object
- * @param {Object} data - Datos a enviar
- * @param {number} statusCode - Código HTTP
- */
 const sendSuccess = (res, data, statusCode = 200) => {
   res.status(statusCode).json({
     success: true,
@@ -61,12 +27,6 @@ const sendSuccess = (res, data, statusCode = 200) => {
   });
 };
 
-/**
- * Envía respuesta de error
- * @param {Object} res - Response object
- * @param {string} message - Mensaje de error
- * @param {number} statusCode - Código HTTP
- */
 const sendError = (res, message, statusCode = 500) => {
   res.status(statusCode).json({
     success: false,
@@ -79,55 +39,64 @@ const sendError = (res, message, statusCode = 500) => {
 // ENDPOINTS PRINCIPALES
 // ======================================================
 
-/**
- * GET /:slug/menu
- * Obtiene el menú completo de un restaurante por slug
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const getMenuBySlug = async (req, res) => {
   try {
+    console.log('=== getMenuBySlug START ===');
     const { slug } = req.params;
     const { branch_id, skip_cache } = req.query;
     
+    console.log('Slug:', slug);
+    console.log('Branch ID:', branch_id);
+    
     const tenant = await Tenant.findBySlug(slug);
+    console.log('Tenant encontrado:', tenant ? tenant.id : 'NO');
+    
     if (!tenant) {
+      console.log('ERROR: Restaurante no encontrado para slug:', slug);
       return sendError(res, 'Restaurante no encontrado', 404);
     }
     
     let branchId = branch_id;
     
     if (!branchId) {
+      console.log('Buscando sedes para tenant:', tenant.id);
       const branches = await Branch.findByTenant(tenant.id, { onlyActive: true });
+      console.log('Sedes encontradas:', branches.length);
       if (branches.length === 0) {
         return sendError(res, 'No hay sedes disponibles para este restaurante', 404);
       }
       branchId = branches[0].id;
+      console.log('Branch seleccionado:', branchId);
     }
     
+    console.log('Verificando branch:', branchId);
     const branch = await Branch.findById(branchId);
     if (!branch || branch.tenant_id !== tenant.id) {
+      console.log('ERROR: Sede no encontrada o no pertenece al tenant');
       return sendError(res, 'Sede no encontrada', 404);
     }
     
+    console.log('Obteniendo menú para branch:', branchId);
     const menu = await menuService.getMenuByBranch(branchId, {
       skipCache: skip_cache === 'true',
       onlyAvailable: true,
     });
+    console.log('Menú obtenido exitosamente');
     
     sendSuccess(res, menu);
   } catch (error) {
+    console.error('=== ERROR EN getMenuBySlug ===');
+    console.error('Mensaje:', error.message);
+    console.error('Stack:', error.stack);
     logger.error('Error in getMenuBySlug:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /branch/:branchId/menu
- * Obtiene el menú directamente por ID de sede
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
+// ======================================================
+// RESTO DE FUNCIONES (sin cambios)
+// ======================================================
+
 const getMenuByBranchId = async (req, res) => {
   try {
     const { branchId } = req.params;
@@ -149,17 +118,12 @@ const getMenuByBranchId = async (req, res) => {
     
     sendSuccess(res, menu);
   } catch (error) {
+    console.error('=== ERROR EN getMenuByBranchId ===', error);
     logger.error('Error in getMenuByBranchId:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /table/:tableId/menu
- * Obtiene el menú específico para una mesa
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const getMenuByTable = async (req, res) => {
   try {
     const { tableId } = req.params;
@@ -181,17 +145,12 @@ const getMenuByTable = async (req, res) => {
     
     sendSuccess(res, menu);
   } catch (error) {
+    console.error('=== ERROR EN getMenuByTable ===', error);
     logger.error('Error in getMenuByTable:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /:slug/featured
- * Obtiene productos destacados de un restaurante
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const getFeaturedProducts = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -215,17 +174,12 @@ const getFeaturedProducts = async (req, res) => {
     
     sendSuccess(res, { products, count: products.length });
   } catch (error) {
+    console.error('=== ERROR EN getFeaturedProducts ===', error);
     logger.error('Error in getFeaturedProducts:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /:slug/daily-menu
- * Obtiene el menú del día (para almuerzos ejecutivos)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const getDailyMenu = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -253,17 +207,12 @@ const getDailyMenu = async (req, res) => {
     
     sendSuccess(res, dailyMenu);
   } catch (error) {
+    console.error('=== ERROR EN getDailyMenu ===', error);
     logger.error('Error in getDailyMenu:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /:slug/search
- * Busca productos en el menú
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const searchProducts = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -295,17 +244,12 @@ const searchProducts = async (req, res) => {
       count: results.length,
     });
   } catch (error) {
+    console.error('=== ERROR EN searchProducts ===', error);
     logger.error('Error in searchProducts:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * GET /branch/:branchId/status
- * Verifica el estado de una sede (abierta/cerrada)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const getBranchStatus = async (req, res) => {
   try {
     const { branchId } = req.params;
@@ -326,17 +270,12 @@ const getBranchStatus = async (req, res) => {
       next_open: isOpen.nextOpen,
     });
   } catch (error) {
+    console.error('=== ERROR EN getBranchStatus ===', error);
     logger.error('Error in getBranchStatus:', error.message);
     sendError(res, error.message, 500);
   }
 };
 
-/**
- * POST /branch/:branchId/check-delivery
- * Verifica cobertura de domicilio
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 const checkDeliveryCoverage = async (req, res) => {
   try {
     const { branchId } = req.params;
@@ -354,6 +293,7 @@ const checkDeliveryCoverage = async (req, res) => {
     
     sendSuccess(res, coverage);
   } catch (error) {
+    console.error('=== ERROR EN checkDeliveryCoverage ===', error);
     logger.error('Error in checkDeliveryCoverage:', error.message);
     sendError(res, error.message, 500);
   }

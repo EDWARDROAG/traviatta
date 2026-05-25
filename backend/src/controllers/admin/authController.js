@@ -41,6 +41,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const Tenant = require('../../models/Tenant');
 const logger = require('../../utils/logger');
+const redis = require('../../config/redis');
 
 // ======================================================
 // CONSTANTES
@@ -173,6 +174,13 @@ const login = async (req, res) => {
     
     // Registrar inicio de sesión
     logger.info(`Login successful for tenant: ${tenant.slug}`);
+
+    // Guardar sesión en Redis (TTL 1 hora)
+    try {
+      await redis.setSession(token, { tenant_id: tenant.id, user: { id: tenant.id, name: tenant.name } }, 3600);
+    } catch (err) {
+      logger.warn('Could not save session to Redis:', err.message);
+    }
     
     sendSuccess(res, {
       token,

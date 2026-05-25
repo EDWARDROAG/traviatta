@@ -77,8 +77,12 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
       }, 0);
   };
 
-  const totalPrice = product.price + getModifiersTotal();
+  const basePrice = product.price || 0;
+  const totalPrice = basePrice + getModifiersTotal();
   const finalPrice = totalPrice * quantity;
+  const priceLabel = basePrice > 0 ? `$${basePrice.toLocaleString()}` : 'Consultar precio';
+  const finalPriceLabel = finalPrice > 0 ? `$${finalPrice.toLocaleString()}` : 'Consultar precio';
+  const canAddToCart = product.is_available && finalPrice > 0;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition">
@@ -105,7 +109,7 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
               )}
             </div>
             <span className="font-bold text-orange-600 text-sm">
-              ${product.price.toLocaleString()}
+              {priceLabel}
             </span>
           </div>
           
@@ -179,9 +183,10 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
             ) : (
               <button
                 onClick={handleAddToCart}
-                className="bg-orange-600 text-white px-4 py-1 rounded-lg text-sm font-medium hover:bg-orange-700 transition"
+                className={`bg-orange-600 text-white px-4 py-1 rounded-lg text-sm font-medium hover:bg-orange-700 transition ${!canAddToCart ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={!canAddToCart}
               >
-                Agregar ${finalPrice.toLocaleString()}
+                {canAddToCart ? `Agregar ${finalPriceLabel}` : 'Consultar precio'}
               </button>
             )}
           </div>

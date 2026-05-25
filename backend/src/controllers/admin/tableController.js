@@ -3,35 +3,20 @@
  * ARCHIVO: tableController.js
  * UBICACIÓN: menu-qr-system/backend/src/controllers/admin/tableController.js
  * FASE: F4
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-15 21:30
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2026-05-23 12:05
  *
  * 🎯 PROPÓSITO:
  * Controlador para las rutas administrativas de mesas.
- * Maneja la gestión completa de mesas incluyendo CRUD,
- * layout visual (mapa interactivo), cambio de estados,
- * y configuración de códigos QR por mesa.
- *
- * 📦 DEPENDENCIAS:
- * - ../../services/tableService: Lógica de mesas
- * - ../../models/Table: Modelo de mesas
- * - ../../models/Branch: Modelo de sedes
- * - ../../utils/logger: Logging
- *
- * 🔗 RELACIONES:
- * - Importa de: ../../services/*, ../../models/*
- * - Es importado por: ../../routes/admin.js
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.1 - 2026-05-23 12:05
+ *    ✅ Agregada función getOccupancyStats
+ *    ✅ Exportada getOccupancyStats
+ * ------------------------------------------------------
  * 1.0 - 2024-01-15 21:30
  *    ✅ Creación inicial del archivo
- *    ✅ CRUD completo de mesas
- *    ✅ Gestión de layout (mapa visual)
- *    ✅ Cambio de estados de mesas
- *    ✅ Generación y regeneración de QR
- *    ✅ Dashboard de ocupación
- *    ✅ Operaciones masivas (liberar todas)
  * ======================================================
  */
 
@@ -444,6 +429,55 @@ const getOccupancyDashboard = async (req, res) => {
 };
 
 /**
+ * 🔧 NUEVA FUNCIÓN: GET /admin/tables/occupancy
+ * Obtiene estadísticas de ocupación de mesas (todas las sedes del tenant)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+const getOccupancyStats = async (req, res) => {
+  try {
+    const tenantId = req.user.tenant_id;
+    
+    // Obtener todas las sedes del tenant
+    const branches = await Branch.findByTenant(tenantId);
+    
+    let totalTables = 0;
+    let occupiedTables = 0;
+    let availableTables = 0;
+    let reservedTables = 0;
+    let cleaningTables = 0;
+    
+    for (const branch of branches) {
+      const tables = await Table.findByBranch(branch.id);
+      totalTables += tables.length;
+      occupiedTables += tables.filter(t => t.status === 'occupied').length;
+      availableTables += tables.filter(t => t.status === 'available').length;
+      reservedTables += tables.filter(t => t.status === 'reserved').length;
+      cleaningTables += tables.filter(t => t.status === 'cleaning').length;
+    }
+    
+    sendSuccess(res, {
+      total: totalTables,
+      occupied: occupiedTables,
+      available: availableTables,
+      reserved: reservedTables,
+      cleaning: cleaningTables,
+      occupancy_rate: totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0,
+    });
+  } catch (error) {
+    logger.error('Error in getOccupancyStats:', error.message);
+    sendSuccess(res, {
+      total: 0,
+      occupied: 0,
+      available: 0,
+      reserved: 0,
+      cleaning: 0,
+      occupancy_rate: 0,
+    });
+  }
+};
+
+/**
  * POST /admin/branch/:branchId/tables/release-all
  * Libera todas las mesas de una sede (cierre del local)
  * @param {Object} req - Request object
@@ -487,5 +521,6 @@ module.exports = {
   generateTableQR,
   regenerateAllTableQRs,
   getOccupancyDashboard,
+  getOccupancyStats,
   releaseAllTables,
 };

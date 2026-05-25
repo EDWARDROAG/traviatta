@@ -2,32 +2,15 @@
  * ======================================================
  * ARCHIVO: CartFloating.jsx
  * UBICACIÓN: menu-qr-system/frontend/src/components/CartFloating.jsx
- * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 14:45
+ * FASE: F1 - DEBUG
+ * VERSIÓN: 1.1-DEBUG
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 17:30
  *
  * 🎯 PROPÓSITO:
- * Componente flotante que muestra un resumen del carrito
- * en la parte inferior de la pantalla mientras el usuario
- * navega por el menú. Permite ver items, modificar
- * cantidades y proceder al checkout.
+ * Componente flotante que muestra un resumen del carrito.
+ * VERSIÓN CON LOGS PARA DEBUG.
  *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- * - react-router-dom: Navegación
- *
- * 🔗 RELACIONES:
- * - Importado por: MenuPage.jsx, TableMenuPage.jsx
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-16 14:45
- *    ✅ Creación inicial del archivo
- *    ✅ Vista expandible del carrito
- *    ✅ Modificación de cantidades
- *    ✅ Eliminación de items
- *    ✅ Total visible siempre
- *    ✅ Botón para proceder al checkout
+ * 🐛 DEBUG ACTIVADO: SI
  * ======================================================
  */
 
@@ -48,16 +31,30 @@ function CartFloating({
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
 
+  console.log('🐛 [CartFloating] Renderizado - itemCount:', itemCount);
+  console.log('🐛 [CartFloating] onCheckout recibido:', typeof onCheckout, onCheckout ? '✅ existe' : '❌ NO EXISTE');
+
   const handleCheckout = () => {
+    console.log('🐛 [CartFloating] 🔴🔴🔴 handleCheckout EJECUTADO 🔴🔴🔴');
+    console.log('🐛 [CartFloating] onCheckout existe?', !!onCheckout);
+    
     if (onCheckout) {
+      console.log('🐛 [CartFloating] Ejecutando onCheckout...');
       onCheckout();
+      console.log('🐛 [CartFloating] onCheckout ejecutado');
     } else {
+      console.log('🐛 [CartFloating] onCheckout NO EXISTE, usando navigate("/checkout") directo');
       navigate('/checkout');
     }
   };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-20">
+      {/* BANNER DEBUG EN EL CARRITO */}
+      <div className="bg-purple-100 text-purple-800 text-xs text-center py-0.5">
+        🐛 DEBUG | onCheckout: {onCheckout ? '✅' : '❌'}
+      </div>
+
       {/* Carrito colapsado */}
       {!isExpanded && (
         <button

@@ -3,34 +3,20 @@
  * ARCHIVO: categoryController.js
  * UBICACIÓN: menu-qr-system/backend/src/controllers/admin/categoryController.js
  * FASE: F2
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 00:00
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2026-05-23 12:50
  *
  * 🎯 PROPÓSITO:
  * Controlador para la gestión completa de categorías
- * en el panel administrativo. Maneja creación, edición,
- * eliminación, reordenamiento, y configuración de
- * horarios por categoría.
- *
- * 📦 DEPENDENCIAS:
- * - ../../models/Category: Modelo de categorías
- * - ../../models/Branch: Modelo de sedes
- * - ../../services/menuService: Invalidación de caché
- * - ../../utils/logger: Logging
- *
- * 🔗 RELACIONES:
- * - Importa de: ../../models/*, ../../services/*
- * - Es importado por: ../../routes/admin.js
+ * en el panel administrativo.
  *
  * 📋 HISTORIAL DE CAMBIOS:
  * ------------------------------------------------------
+ * 1.1 - 2026-05-23 12:50
+ *    ✅ Agregada función getAllCategories
+ * ------------------------------------------------------
  * 1.0 - 2024-01-16 00:00
  *    ✅ Creación inicial del archivo
- *    ✅ CRUD completo de categorías
- *    ✅ Reordenamiento de categorías
- *    ✅ Configuración de horarios por categoría
- *    ✅ Asignación de módulos (breakfast, lunch, etc.)
- *    ✅ Activación/desactivación de categorías
  * ======================================================
  */
 
@@ -39,6 +25,7 @@ const Branch = require('../../models/Branch');
 const Product = require('../../models/Product');
 const menuService = require('../../services/menuService');
 const logger = require('../../utils/logger');
+const { readQuery } = require('../../config/database');
 
 // ======================================================
 // FUNCIONES AUXILIARES
@@ -86,6 +73,53 @@ const verifyBranchOwnership = async (branchId, tenantId) => {
 // ======================================================
 // CRUD DE CATEGORÍAS
 // ======================================================
+
+/**
+ * 🔧 NUEVA FUNCIÓN: GET /admin/categories
+ * Obtiene todas las categorías de todas las sedes del restaurante
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+const getAllCategories = async (req, res) => {
+  try {
+    const tenantId = req.user.tenant_id;
+    const { only_active, module_type, branch_id } = req.query;
+    
+    let query = `
+      SELECT c.*, b.name as branch_name, b.id as branch_id
+      FROM categories c
+      JOIN branches b ON c.branch_id = b.id
+      WHERE b.tenant_id = $1
+    `;
+    const params = [tenantId];
+    let paramIndex = 2;
+    
+    if (only_active === 'true') {
+      query += ` AND c.is_active = true`;
+    }
+    
+    if (module_type) {
+      query += ` AND c.module_type = $${paramIndex}`;
+      params.push(module_type);
+      paramIndex++;
+    }
+    
+    if (branch_id) {
+      query += ` AND c.branch_id = $${paramIndex}`;
+      params.push(branch_id);
+      paramIndex++;
+    }
+    
+    query += ` ORDER BY b.name, c.display_order`;
+    
+    const result = await readQuery(query, params);
+    
+    sendSuccess(res, result.rows);
+  } catch (error) {
+    logger.error('Error in getAllCategories:', error.message);
+    sendError(res, error.message, 500);
+  }
+};
 
 /**
  * GET /admin/branch/:branchId/categories
@@ -426,6 +460,7 @@ const updateCategorySchedule = async (req, res) => {
 // ======================================================
 
 module.exports = {
+  getAllCategories,
   getCategoriesByBranch,
   getCategoryById,
   createCategory,

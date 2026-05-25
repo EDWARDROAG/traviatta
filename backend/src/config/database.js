@@ -3,8 +3,8 @@
  * ARCHIVO: database.js
  * UBICACIÓN: menu-qr-system/backend/src/config/database.js
  * FASE: F0
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-15 11:00
+ * VERSIÓN: 1.1
+ * ÚLTIMA ACTUALIZACIÓN: 2024-05-21 16:00
  *
  * 🎯 PROPÓSITO:
  * Configurar la conexión a PostgreSQL con soporte para
@@ -21,6 +21,10 @@
  * - Es importado por: models/*, services/*, app.js
  *
  * 📋 HISTORIAL DE CAMBIOS:
+ * ------------------------------------------------------
+ * 1.1 - 2024-05-21 16:00
+ *    ✅ Corregida la función readQuery para resolver error "query is not a function"
+ *    ✅ Agregados logs de depuración en readQuery y writeQuery
  * ------------------------------------------------------
  * 1.0 - 2024-01-15 11:00
  *    ✅ Creación inicial del archivo
@@ -141,22 +145,22 @@ const getReadConnection = () => getNextReplica().pool;
 
 /**
  * Ejecuta una consulta en el pool especificado
- * @param {string} query - Consulta SQL
+ * @param {string} queryText - Consulta SQL
  * @param {Array} params - Parámetros de la consulta
  * @param {Pool} pool - Pool específico (opcional)
  * @returns {Promise<Object>} Resultado de la consulta
  */
-const query = async (query, params = [], pool = null) => {
+const query = async (queryText, params = [], pool = null) => {
   const targetPool = pool || masterPool;
   const startTime = Date.now();
   
   try {
-    const result = await targetPool.query(query, params);
+    const result = await targetPool.query(queryText, params);
     const duration = Date.now() - startTime;
     
     // Log de consultas lentas (> 500ms)
     if (duration > 500) {
-      console.warn(`⚠️ Consulta lenta (${duration}ms): ${query.substring(0, 100)}`);
+      console.warn(`⚠️ Consulta lenta (${duration}ms): ${queryText.substring(0, 100)}`);
     }
     
     return result;
@@ -168,23 +172,25 @@ const query = async (query, params = [], pool = null) => {
 
 /**
  * Ejecuta una consulta de lectura (usa réplica)
- * @param {string} query - Consulta SQL
+ * @param {string} queryText - Consulta SQL
  * @param {Array} params - Parámetros de la consulta
  * @returns {Promise<Object>} Resultado de la consulta
  */
-const readQuery = async (query, params = []) => {
+const readQuery = async (queryText, params = []) => {
+  console.log('🔍 readQuery called');
   const replica = getNextReplica();
-  return query(query, params, replica.pool);
+  return query(queryText, params, replica.pool);
 };
 
 /**
  * Ejecuta una consulta de escritura (usa master)
- * @param {string} query - Consulta SQL
+ * @param {string} queryText - Consulta SQL
  * @param {Array} params - Parámetros de la consulta
  * @returns {Promise<Object>} Resultado de la consulta
  */
-const writeQuery = async (query, params = []) => {
-  return query(query, params, masterPool);
+const writeQuery = async (queryText, params = []) => {
+  console.log('✍️ writeQuery called');
+  return query(queryText, params, masterPool);
 };
 
 /**

@@ -1,14 +1,14 @@
 # Despliega el frontend React (Vite) en GitHub Pages.
 # URL esperada: https://lamakinetfood-png.github.io/lamakinetfood/
 #
-# Requisito (una sola vez): Settings → Pages → Source: GitHub Actions
-# Patrón: Pañalera (Pages) + Aura (build Vite)
+# Una sola vez en GitHub:
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
 
 name: Deploy frontend (Pages)
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-pages.yml'
@@ -44,9 +44,17 @@ jobs:
       - name: Instalar y construir frontend
         working-directory: frontend
         env:
+          # Project site bajo /lamakinetfood/
           VITE_BASE_PATH: /lamakinetfood/
+          # Carta digital sin API (staticMenus)
+          VITE_USE_STATIC_MENU: 'true'
         run: |
-          npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "⚠️ Sin package-lock.json — usando npm install"
+            npm install
+          fi
           npm run build
 
       - name: SPA fallback (404 → index.html)
@@ -56,6 +64,7 @@ jobs:
         run: |
           test -f frontend/dist/index.html || (echo "❌ Falta frontend/dist/index.html" && exit 1)
           echo "✅ Se publicará frontend/dist/"
+          ls -la frontend/dist | head -20
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
@@ -73,4 +82,7 @@ jobs:
         run: |
           echo "## Vista previa publicada" >> "$GITHUB_STEP_SUMMARY"
           echo "**URL:** ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Frontend Vite desde \`frontend/\` con base \`/lamakinetfood/\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Base Vite: \`/lamakinetfood/\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Menú estático: \`VITE_USE_STATIC_MENU=true\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repo: \`lamakinetfood-png/lamakinetfood\`" >> "$GITHUB_STEP_SUMMARY"

@@ -46,7 +46,26 @@ https://lamakinetfood-png.github.io/lamakinetfood/
 
 Confirmá en Settings → Pages. Base de build: `VITE_BASE_PATH=/lamakinetfood/`.
 
-**Estado workflow:** archivo `.github/workflows/deploy-pages.yml` listo · falta commit/push + Source: GitHub Actions.
+## Estado workflow
+
+Archivos listos:
+
+| Archivo | Rol |
+|---------|-----|
+| `.github/workflows/deploy-pages.yml` | Build Vite + publicar Pages |
+| `.github/workflows/ci.yml` | Build de verificación en push/PR |
+| `frontend/package-lock.json` | **Debe ir en el commit** (`npm ci`) |
+| `VITE_BASE_PATH=/lamakinetfood/` | Base del project site |
+| `VITE_USE_STATIC_MENU=true` | Carta QR sin API en el preview |
+
+**Importante:** el `.gitignore` ya no ignora `package-lock.json` (antes hacía fallar Actions).
+
+### Checklist CEO (una vez)
+
+1. Commit + push a `main` (incluye `frontend/package-lock.json` y workflows)
+2. Repo → **Settings → Pages → Source: GitHub Actions**
+3. Actions → workflow **Deploy frontend (Pages)** en verde
+4. Abrir: https://lamakinetfood-png.github.io/lamakinetfood/
 
 ---
 

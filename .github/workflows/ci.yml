@@ -25,9 +25,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Instalar
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
       - name: Build
         env:
           VITE_BASE_PATH: /
+          VITE_USE_STATIC_MENU: 'true'
         run: npm run build

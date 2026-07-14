@@ -19,7 +19,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+# package-lock.json se VERSIONA (necesario para npm ci en GitHub Actions)
 yarn.lock
 
 # ======================================================
@@ -147,6 +147,12 @@ backend/logs/
 # Frontend
 frontend/dist/
 frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/node_modules/
+frontend/.vite/
+frontend/coverage/
+frontend/.eslintcache
 
 # Admin panel
 admin-panel/dist/

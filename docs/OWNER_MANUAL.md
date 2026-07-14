@@ -345,7 +345,7 @@ Configura los horarios de atención por día:
 ### Pestaña "WhatsApp"
 
 - **Número de WhatsApp**: Donde llegarán los pedidos
-- Formato: código país + número (ej: 3184990637)
+- Formato: código país + número (ej: 3193856893)
 
 ### Pestaña "Domicilio"
 

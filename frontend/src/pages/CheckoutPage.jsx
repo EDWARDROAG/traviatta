@@ -1,47 +1,18 @@
 /**
- * ======================================================
- * ARCHIVO: CheckoutPage.jsx
- * UBICACIÓN: menu-qr-system/frontend/src/pages/CheckoutPage.jsx
- * FASE: F1
- * VERSIÓN: 1.1
- * ÚLTIMA ACTUALIZACIÓN: 2024-05-22 16:00
- *
- * 🎯 PROPÓSITO:
- * Página de checkout donde el cliente ingresa sus datos
- * de contacto y dirección, revisa el resumen del pedido
- * y lo envía al backend. El backend crea el pedido y
- * luego se abre WhatsApp para confirmación.
- *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- * - react-router-dom: Navegación
- * - ../hooks/useCart: Manejo del carrito
- * - ../services/api: createOrder
- * - ../services/whatsapp: sendWhatsAppMessage
- *
- * 🔗 RELACIONES:
- * - Es importado por: App.jsx
- * - Importa hooks y servicios
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.1 - 2024-05-22 16:00
- *    ✅ Corregido: Ahora llama a createOrder del backend
- *    ✅ Corregido: Payload con branch_id, product_id
- *    ✅ Corregido: order_type y delivery_address
- *    ✅ Mejorado: Manejo de errores y loading
- *    ✅ Mejorado: Fallback de WhatsApp
- * ------------------------------------------------------
- * 1.0 - 2024-01-16 13:45
- *    ✅ Creación inicial del archivo
- * ======================================================
+ * Contrato: checkout Menú QR — armar mensaje y abrir WhatsApp (con o sin API).
+ * Consumidores: App ruta `/checkout`.
  */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useCart from '../hooks/useCart';
 import { createOrder } from '../services/api';
 import { sendWhatsAppMessage, formatCurrency } from '../services/whatsapp';
+import {
+  CARTA_PATH,
+  DEFAULT_MENU_SLUG,
+  SITE,
+  USE_STATIC_MENU,
+} from '../data/site';
 
 function CheckoutPage() {
   const navigate = useNavigate();
@@ -50,92 +21,61 @@ function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState(null);
   const [orderCreated, setOrderCreated] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
     delivery_address: '',
     notes: '',
     payment_method: 'cash',
-    order_type: 'delivery', // delivery, pickup, table
+    order_type: 'delivery',
   });
 
-  const branch = location.state?.branch;
-  const branchWhatsapp = branch?.whatsapp_number || branch?.phone;
+  const branch = useMemo(() => {
+    const fromState = location.state?.branch;
+    if (fromState?.id) return fromState;
+    return {
+      id: 'traviatta-pizza-gourmet-branch',
+      name: SITE.fullName,
+      whatsapp_number: SITE.whatsappE164,
+      phone: SITE.whatsapp,
+      slug: DEFAULT_MENU_SLUG,
+      requires_delivery_address: true,
+      free_delivery_min_amount: 60000,
+    };
+  }, [location.state]);
+
+  const branchWhatsapp = SITE.whatsappE164;
   const total = getTotal();
-  const deliveryCost = deliveryInfo?.cost || 0;
+  const deliveryCost =
+    formData.order_type === 'delivery'
+      ? deliveryInfo?.is_free
+        ? 0
+        : deliveryInfo?.cost || 4500
+      : 0;
   const finalTotal = total + deliveryCost;
 
   useEffect(() => {
     if (items.length === 0 && !orderCreated) {
-      navigate(-1);
+      navigate(CARTA_PATH);
     }
   }, [items, navigate, orderCreated]);
 
+  useEffect(() => {
+    if (formData.order_type !== 'delivery') {
+      setDeliveryInfo(null);
+      return;
+    }
+    setDeliveryInfo({
+      cost: 4500,
+      is_free: total >= (branch.free_delivery_min_amount || 60000),
+      is_covered: true,
+    });
+  }, [formData.order_type, total, branch.free_delivery_min_amount]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddressBlur = async () => {
-    if (!formData.delivery_address || !branch?.id || formData.order_type !== 'delivery') return;
-    
-    try {
-      // TODO: Implementar checkDeliveryCoverage si está disponible
-      // Por ahora, asumimos cobertura con costo base
-      setDeliveryInfo({
-        cost: 3000,
-        is_free: false,
-        is_covered: true,
-      });
-    } catch (error) {
-      console.error('Error checking delivery coverage:', error);
-    }
-  };
-
-  // Generar mensaje de WhatsApp para el restaurante
-  const generateWhatsAppMessage = (orderResponse) => {
-    const orderNumber = orderResponse.order_number || orderResponse.id;
-    const itemsList = items.map(item => {
-      const itemTotal = item.price * item.quantity;
-      return `${item.quantity}x ${item.name} - ${formatCurrency(itemTotal)}`;
-    }).join('\n');
-
-    let message = `🍽️ *NUEVO PEDIDO #${orderNumber}* 🍽️\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    message += `👤 *Cliente:* ${formData.customer_name}\n`;
-    message += `📞 *Teléfono:* ${formData.customer_phone}\n`;
-    
-    if (formData.order_type === 'delivery' && formData.delivery_address) {
-      message += `🏠 *Dirección:* ${formData.delivery_address}\n`;
-    } else if (formData.order_type === 'pickup') {
-      message += `📦 *Tipo:* Recoger en local\n`;
-    }
-    
-    message += `\n📋 *DETALLE DEL PEDIDO:*\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `${itemsList}\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `📦 *Subtotal:* ${formatCurrency(total)}\n`;
-    
-    if (deliveryCost > 0) {
-      message += `🚚 *Envío:* ${formatCurrency(deliveryCost)}\n`;
-    } else {
-      message += `🚚 *Envío:* GRATIS\n`;
-    }
-    
-    message += `💰 *TOTAL:* ${formatCurrency(finalTotal)}\n\n`;
-    message += `💳 *Pago:* ${getPaymentMethodName(formData.payment_method)}\n\n`;
-    
-    if (formData.notes) {
-      message += `📝 *Notas:*\n${formData.notes}\n\n`;
-    }
-    
-    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `✅ Pedido creado automáticamente\n`;
-    message += `📞 Confirma respondiendo a este mensaje\n`;
-    
-    return message;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const getPaymentMethodName = (method) => {
@@ -149,17 +89,83 @@ function CheckoutPage() {
     return methods[method] || method;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validaciones básicas
-    if (!formData.customer_name || !formData.customer_phone) {
-      alert('Por favor completa todos los campos obligatorios');
-      return;
+  const generateWhatsAppMessage = (orderMeta) => {
+    const orderNumber = orderMeta.order_number || orderMeta.id;
+    const itemsList = items
+      .map((item) => {
+        const mods =
+          item.modifiers && item.modifiers.length > 0
+            ? ` (${item.modifiers.map((m) => m.name).join(', ')})`
+            : '';
+        const itemTotal =
+          (item.price +
+            (item.modifiers || []).reduce((s, m) => s + (m.price || 0), 0)) *
+          item.quantity;
+        return `${item.quantity}x ${item.name}${mods} - ${formatCurrency(itemTotal)}`;
+      })
+      .join('\n');
+
+    let message = `🍽️ *NUEVO PEDIDO #${orderNumber}* 🍽️\n`;
+    message += `🍕 ${branch.name || SITE.fullName}\n`;
+    message += `📍 ${SITE.sedeName}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `👤 *Cliente:* ${formData.customer_name}\n`;
+    message += `📞 *Teléfono:* ${formData.customer_phone}\n`;
+
+    if (formData.order_type === 'delivery' && formData.delivery_address) {
+      message += `🏠 *Dirección:* ${formData.delivery_address}\n`;
+    } else if (formData.order_type === 'pickup') {
+      message += `📦 *Tipo:* Recoger en local\n`;
     }
 
-    if (!branch?.id) {
-      alert('No se pudo identificar la sucursal. Regresa al menú y selecciona una sucursal válida.');
+    message += `\n📋 *DETALLE DEL PEDIDO:*\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `${itemsList}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `📦 *Subtotal:* ${formatCurrency(total)}\n`;
+
+    if (formData.order_type === 'delivery') {
+      if (deliveryCost > 0) {
+        message += `🚚 *Envío:* ${formatCurrency(deliveryCost)}\n`;
+      } else {
+        message += `🚚 *Envío:* GRATIS\n`;
+      }
+    }
+
+    message += `💰 *TOTAL:* ${formatCurrency(finalTotal)}\n\n`;
+    message += `💳 *Pago:* ${getPaymentMethodName(formData.payment_method)}\n\n`;
+
+    if (formData.notes) {
+      message += `📝 *Notas:*\n${formData.notes}\n\n`;
+    }
+
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `✅ Pedido Menú QR Traviatta\n`;
+    message += `📞 Confirma respondiendo a este mensaje\n`;
+
+    return message;
+  };
+
+  const finishWithWhatsApp = (orderMeta) => {
+    setOrderCreated(orderMeta);
+    const message = generateWhatsAppMessage(orderMeta);
+    const opened = sendWhatsAppMessage(branchWhatsapp, message);
+    clearCart();
+    if (opened) {
+      alert(
+        `✅ Pedido #${orderMeta.order_number} listo.\n\nSe abrió WhatsApp con el mensaje para la pizzería. Solo confirma el envío.`
+      );
+    } else {
+      alert('Pedido armado, pero no se pudo abrir WhatsApp. Revisa el número configurado.');
+    }
+    navigate(CARTA_PATH);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.customer_name || !formData.customer_phone) {
+      alert('Por favor completa todos los campos obligatorios');
       return;
     }
 
@@ -174,11 +180,19 @@ function CheckoutPage() {
     }
 
     setSubmitting(true);
-    
+
+    const localOrder = {
+      id: `qr-${Date.now()}`,
+      order_number: `QR-${Date.now().toString().slice(-6)}`,
+    };
+
     try {
-      // ==================================================
-      // PASO 1: Construir payload correcto para el backend
-      // ==================================================
+      // MVP sin backend: ir directo a WhatsApp con el pedido concatenado
+      if (USE_STATIC_MENU) {
+        finishWithWhatsApp(localOrder);
+        return;
+      }
+
       const orderPayload = {
         branch_id: branch.id,
         customer_name: formData.customer_name,
@@ -186,65 +200,32 @@ function CheckoutPage() {
         order_type: formData.order_type,
         payment_method: formData.payment_method,
         notes: formData.notes,
-        items: items.map(item => ({
-          product_id: item.id,        // ✅ El carrito guarda el product_id como 'id'
+        items: items.map((item) => ({
+          product_id: item.id,
           quantity: item.quantity,
           modifiers: item.modifiers || [],
         })),
       };
-      
-      // Agregar dirección solo si es domicilio
+
       if (formData.order_type === 'delivery' && formData.delivery_address) {
         orderPayload.delivery_address = formData.delivery_address;
       }
-      
-      // Agregar costo de envío si aplica
+
       if (deliveryCost > 0) {
         orderPayload.delivery_cost = deliveryCost;
       }
-      
-      console.log('📦 Enviando pedido al backend:', orderPayload);
-      
-      // ==================================================
-      // PASO 2: Crear pedido en el backend
-      // ==================================================
+
       const orderResponse = await createOrder(orderPayload);
-      
-      console.log('✅ Pedido creado:', orderResponse);
-      
-      if (!orderResponse || !orderResponse.success) {
-        throw new Error(orderResponse?.error || 'Error al crear el pedido');
+
+      if (orderResponse?.success && orderResponse?.data) {
+        finishWithWhatsApp(orderResponse.data);
+        return;
       }
-      
-      const orderData = orderResponse.data;
-      setOrderCreated(orderData);
-      
-      // ==================================================
-      // PASO 3: Generar y enviar mensaje de WhatsApp
-      // ==================================================
-      const whatsappMessage = generateWhatsAppMessage(orderData);
-      
-      // Usar el número de WhatsApp de la sucursal (con fallback)
-      if (branchWhatsapp) {
-        sendWhatsAppMessage(branchWhatsapp, whatsappMessage);
-      } else {
-        console.warn('⚠️ No hay número de WhatsApp configurado');
-        alert('Pedido creado exitosamente. El restaurante se pondrá en contacto contigo.');
-      }
-      
-      // ==================================================
-      // PASO 4: Limpiar carrito y mostrar confirmación
-      // ==================================================
-      clearCart();
-      
-      alert(`✅ ¡Pedido #${orderData.order_number || orderData.id} creado exitosamente!\n\nSe abrirá WhatsApp para confirmar con el restaurante.`);
-      
-      // Navegar de regreso al menú
-      navigate(`/${branch.slug}/menu`);
-      
-    } catch (error) {
-      console.error('❌ Error en checkout:', error);
-      alert(`Error al procesar el pedido: ${error.message}\n\nPor favor intenta nuevamente.`);
+
+      // API falló → igual enviamos por WhatsApp (experiencia Menú QR)
+      finishWithWhatsApp(localOrder);
+    } catch {
+      finishWithWhatsApp(localOrder);
     } finally {
       setSubmitting(false);
     }
@@ -255,18 +236,25 @@ function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Finalizar Pedido</h1>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Formulario de datos */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Tus datos</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="min-h-screen bg-cream py-8 sm:py-12">
+      <div className="container-premium max-w-5xl">
+        <div className="text-center mb-8 sm:mb-10 px-2">
+          <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-charcoal">
+            Finalizar Pedido
+          </h1>
+          <p className="text-stone mt-2 text-xs sm:text-sm">
+            {SITE.sedeName} · Al confirmar se abre WhatsApp con tu pedido
+          </p>
+          <div className="separator-organic mt-4 mx-auto" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <div className="card-premium p-5 sm:p-6 md:p-8 order-2 md:order-1">
+            <h2 className="font-heading text-lg sm:text-xl font-semibold text-charcoal mb-5 sm:mb-6">Tus datos</h2>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-charcoal mb-2">
                   Nombre completo *
                 </label>
                 <input
@@ -274,47 +262,46 @@ function CheckoutPage() {
                   name="customer_name"
                   value={formData.customer_name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  className="input-premium"
+                  placeholder="Ej: Juan Pérez"
                   required
                   disabled={submitting}
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono *
-                </label>
+                <label className="block text-sm font-medium text-charcoal mb-2">Teléfono *</label>
                 <input
                   type="tel"
                   name="customer_phone"
                   value={formData.customer_phone}
                   onChange={handleInputChange}
                   placeholder="3001234567"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  className="input-premium"
                   required
                   disabled={submitting}
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-charcoal mb-2">
                   Tipo de pedido *
                 </label>
                 <select
                   name="order_type"
                   value={formData.order_type}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  className="input-premium appearance-none"
                   disabled={submitting}
                 >
-                  <option value="delivery">Domicilio</option>
-                  <option value="pickup">Recoger en local</option>
+                  <option value="delivery">🚚 Domicilio</option>
+                  <option value="pickup">📦 Recoger en local</option>
                 </select>
               </div>
-              
+
               {formData.order_type === 'delivery' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="animate-fade-in">
+                  <label className="block text-sm font-medium text-charcoal mb-2">
                     Dirección de entrega *
                   </label>
                   <input
@@ -322,43 +309,45 @@ function CheckoutPage() {
                     name="delivery_address"
                     value={formData.delivery_address}
                     onChange={handleInputChange}
-                    onBlur={handleAddressBlur}
                     placeholder="Calle, número, barrio"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    className="input-premium"
                     disabled={submitting}
                   />
                   {deliveryInfo && (
-                    <p className={`text-xs mt-1 ${deliveryInfo.is_free ? 'text-green-600' : 'text-orange-600'}`}>
-                      {deliveryInfo.is_free 
-                        ? '✅ Envío gratis en esta zona' 
-                        : `🚚 Costo de envío: ${formatCurrency(deliveryInfo.cost)}`
-                      }
+                    <p
+                      className={`text-xs mt-2 ${
+                        deliveryInfo.is_free ? 'text-green-600' : 'text-terracotta'
+                      }`}
+                    >
+                      {deliveryInfo.is_free
+                        ? '✅ Envío gratis en esta zona'
+                        : `🚚 Costo de envío: ${formatCurrency(deliveryInfo.cost)}`}
                     </p>
                   )}
                 </div>
               )}
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-charcoal mb-2">
                   Método de pago
                 </label>
                 <select
                   name="payment_method"
                   value={formData.payment_method}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  className="input-premium appearance-none"
                   disabled={submitting}
                 >
-                  <option value="cash">Efectivo contra entrega</option>
-                  <option value="card">Tarjeta (datáfono)</option>
-                  <option value="transfer">Transferencia bancaria</option>
-                  <option value="nequi">Nequi</option>
-                  <option value="daviplata">Daviplata</option>
+                  <option value="cash">💰 Efectivo contra entrega</option>
+                  <option value="card">💳 Tarjeta (datáfono)</option>
+                  <option value="transfer">🏦 Transferencia bancaria</option>
+                  <option value="nequi">📱 Nequi</option>
+                  <option value="daviplata">📱 Daviplata</option>
                 </select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-charcoal mb-2">
                   Notas especiales
                 </label>
                 <textarea
@@ -367,55 +356,76 @@ function CheckoutPage() {
                   onChange={handleInputChange}
                   rows="3"
                   placeholder="Sin cebolla, entrada por la calle 123, etc."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  className="input-premium resize-none"
                   disabled={submitting}
                 />
               </div>
             </form>
           </div>
-          
-          {/* Resumen del pedido */}
-          <div className="bg-white rounded-lg shadow p-6 h-fit sticky top-4">
-            <h2 className="text-lg font-semibold mb-4">Resumen del pedido</h2>
-            
-            <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+
+          <div className="card-premium p-5 sm:p-6 md:p-8 h-fit md:sticky md:top-24 order-1 md:order-2">
+            <h2 className="font-heading text-lg sm:text-xl font-semibold text-charcoal mb-5 sm:mb-6">
+              Resumen del pedido
+            </h2>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto mb-6 pr-2">
               {items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>{item.quantity}x {item.name}</span>
-                  <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                <div
+                  key={`${item.id}-${JSON.stringify(item.modifiers)}`}
+                  className="flex justify-between text-sm py-2 border-b border-stone/20 last:border-0"
+                >
+                  <span className="text-charcoal">
+                    {item.quantity}x {item.name}
+                  </span>
+                  <span className="font-medium text-terracotta">
+                    {formatCurrency(item.price * item.quantity)}
+                  </span>
                 </div>
               ))}
             </div>
-            
-            <div className="border-t pt-3 space-y-2">
+
+            <div className="border-t border-stone/30 pt-4 space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span>{formatCurrency(total)}</span>
+                <span className="text-stone">Subtotal</span>
+                <span className="text-charcoal">{formatCurrency(total)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Envío</span>
-                <span>{deliveryCost === 0 ? 'Gratis' : formatCurrency(deliveryCost)}</span>
+                <span className="text-stone">Envío</span>
+                <span className="text-charcoal">
+                  {formData.order_type === 'pickup'
+                    ? '—'
+                    : deliveryCost === 0
+                      ? 'Gratis'
+                      : formatCurrency(deliveryCost)}
+                </span>
               </div>
-              <div className="flex justify-between font-bold text-lg pt-2 border-t">
+              <div className="flex justify-between font-heading text-xl font-bold pt-3 border-t border-stone/30">
                 <span>Total</span>
-                <span className="text-orange-600">{formatCurrency(finalTotal)}</span>
+                <span className="text-terracotta">{formatCurrency(finalTotal)}</span>
               </div>
             </div>
-            
+
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="w-full mt-6 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50"
+              className="btn-primary w-full mt-8 py-3.5 text-base font-semibold"
             >
-              {submitting ? 'Procesando pedido...' : 'Confirmar pedido'}
+              {submitting ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Abriendo WhatsApp...
+                </div>
+              ) : (
+                `Enviar pedido por WhatsApp • ${formatCurrency(finalTotal)}`
+              )}
             </button>
-            
+
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(CARTA_PATH)}
               disabled={submitting}
-              className="w-full mt-3 text-gray-500 text-sm hover:text-gray-700"
+              className="w-full mt-3 text-stone text-sm hover:text-terracotta transition-smooth"
             >
-              ← Volver al menú
+              ← Volver al menú QR
             </button>
           </div>
         </div>

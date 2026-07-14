@@ -103,7 +103,7 @@ Obtiene el menú completo de un restaurante.
       "id": "uuid",
       "name": "El Sabor Costeño",
       "logo_url": "https://cloudinary.com/...",
-      "whatsapp_number": "3184990637",
+      "whatsapp_number": "3193856893",
       "is_open": true
     },
     "modules": [
@@ -271,6 +271,57 @@ json
 POST /admin/auth/logout
 Cierra sesión.
 
+POST /admin/auth/register
+Registra un nuevo restaurante y tenant.
+
+Body de la petición:
+
+json
+{
+  "name": "Mi Restaurante",
+  "email": "admin@restaurante.com",
+  "password": "password123",
+  "phone": "3193856893"
+}
+
+POST /admin/auth/verify
+Verifica el token JWT del administrador.
+
+Headers:
+Authorization: Bearer <token>
+
+POST /admin/auth/change-password
+Cambia la contraseña del administrador.
+
+Body de la petición:
+
+json
+{
+  "current_password": "password123",
+  "new_password": "password456"
+}
+
+POST /admin/auth/forgot-password
+Inicia el flujo de recuperación de contraseña.
+
+Body de la petición:
+
+json
+{
+  "email": "admin@restaurante.com"
+}
+
+POST /admin/auth/reset-password
+Restablece la contraseña con token de recuperación.
+
+Body de la petición:
+
+json
+{
+  "token": "reset-token",
+  "new_password": "password456"
+}
+
 POST /admin/auth/refresh-token
 Refresca el token JWT.
 
@@ -356,7 +407,7 @@ json
   "name": "Sede Norte",
   "address": "Calle 123",
   "phone": "1234567",
-  "whatsapp_number": "3184990637",
+  "whatsapp_number": "3193856893",
   "delivery_cost": 3000,
   "free_delivery_min_amount": 30000
 }
@@ -455,7 +506,7 @@ Actualiza configuración general.
 json
 {
   "name": "Mi Restaurante",
-  "whatsapp_number": "3184990637",
+  "whatsapp_number": "3193856893",
   "primary_color": "#FF6B35"
 }
 POST /admin/settings/logo

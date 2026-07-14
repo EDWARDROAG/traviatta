@@ -26,61 +26,62 @@ GET	/health	Health check del servicio	✅ Implementado
 ENDPOINTS ADMINISTRATIVOS (Panel de Control)
 2.1 Autenticación
 Método	Endpoint	Descripción	Estado
-POST	/admin/auth/login	Iniciar sesión	❌ No implementado
-POST	/admin/auth/logout	Cerrar sesión	❌ No implementado
-GET	/admin/auth/verify	Verificar token JWT	❌ No implementado
-POST	/admin/auth/register	Registrar nuevo restaurante	❌ No implementado
-POST	/admin/auth/change-password	Cambiar contraseña	❌ No implementado
-POST	/admin/auth/forgot-password	Recuperar contraseña	❌ No implementado
+POST	/admin/auth/login	Iniciar sesión	✅ Implementado
+POST	/admin/auth/logout	Cerrar sesión	✅ Implementado
+GET	/admin/auth/verify	Verificar token JWT	✅ Implementado
+POST	/admin/auth/register	Registrar nuevo restaurante	✅ Implementado
+POST	/admin/auth/change-password	Cambiar contraseña	✅ Implementado
+POST	/admin/auth/forgot-password	Recuperar contraseña	✅ Implementado
+POST	/admin/auth/reset-password	Restablecer contraseña	✅ Implementado
 2.2 Dashboard
 Método	Endpoint	Descripción	Estado
-GET	/admin/dashboard/stats	Estadísticas generales del día	❌ No implementado
-GET	/admin/dashboard/revenue	Ingresos por período	❌ No implementado
-GET	/admin/dashboard/top-products	Productos más vendidos	❌ No implementado
-GET	/admin/orders/stats	Estadísticas de pedidos	❌ No implementado
+GET	/admin/dashboard/stats	Estadísticas generales del día	✅ Implementado
+GET	/admin/dashboard/revenue	Ingresos por período	✅ Implementado
+GET	/admin/dashboard/top-products	Productos más vendidos	✅ Implementado
+GET	/admin/orders/stats	Estadísticas de pedidos	✅ Implementado
 2.3 Gestión de Productos
 Método	Endpoint	Descripción	Estado
-GET	/admin/products	Listar todos los productos	❌ No implementado
-GET	/admin/products/:id	Obtener producto por ID	❌ No implementado
-POST	/admin/products	Crear nuevo producto	❌ No implementado
-PUT	/admin/products/:id	Actualizar producto	❌ No implementado
-DELETE	/admin/products/:id	Eliminar producto	❌ No implementado
-POST	/admin/products/:id/image	Subir imagen de producto	❌ No implementado
-DELETE	/admin/products/:id/image	Eliminar imagen de producto	❌ No implementado
+GET	/admin/products	Listar todos los productos	✅ Implementado
+GET	/admin/products/:id	Obtener producto por ID	✅ Implementado
+POST	/admin/products	Crear nuevo producto	✅ Implementado
+PUT	/admin/products/:id	Actualizar producto	✅ Implementado
+DELETE	/admin/products/:id	Eliminar producto	✅ Implementado
+POST	/admin/products/:id/image	Subir imagen de producto	⚠️ No existe ruta dedicada; usa /admin/products o /admin/products/:id con field image
+DELETE	/admin/products/:id/image	Eliminar imagen de producto	⚠️ No existe ruta dedicada
 2.4 Gestión de Categorías
 Método	Endpoint	Descripción	Estado
-GET	/admin/categories	Listar categorías	❌ No implementado
-POST	/admin/categories	Crear categoría	❌ No implementado
-PUT	/admin/categories/:id	Actualizar categoría	❌ No implementado
-DELETE	/admin/categories/:id	Eliminar categoría	❌ No implementado
-PUT	/admin/categories/reorder	Reordenar categorías	❌ No implementado
+GET	/admin/categories	Listar categorías	✅ Implementado
+POST	/admin/categories	Crear categoría	❌ No implementado (usa /admin/branch/:branchId/categories)
+PUT	/admin/categories/:id	Actualizar categoría	✅ Implementado
+DELETE	/admin/categories/:id	Eliminar categoría	✅ Implementado
+PUT	/admin/categories/reorder	Reordenar categorías	⚠️ No existe ruta exacta; usa /admin/branch/:branchId/categories/reorder
 2.5 Gestión de Sedes (Branches)
 Método	Endpoint	Descripción	Estado
-GET	/admin/branches	Listar sedes	❌ No implementado
-GET	/admin/branches/:id	Obtener sede por ID	❌ No implementado
-POST	/admin/branches	Crear nueva sede	❌ No implementado
-PUT	/admin/branches/:id	Actualizar sede	❌ No implementado
-DELETE	/admin/branches/:id	Eliminar sede	❌ No implementado
-GET	/admin/branches/:id/modules	Obtener módulos de la sede	❌ No implementado
-PUT	/admin/branches/:id/modules	Configurar módulos de la sede	❌ No implementado
+GET	/admin/branches	Listar sedes	✅ Implementado
+GET	/admin/branches/:id	Obtener sede por ID	✅ Implementado
+POST	/admin/branches	Crear nueva sede	✅ Implementado
+PUT	/admin/branches/:id	Actualizar sede	✅ Implementado
+DELETE	/admin/branches/:id	Eliminar sede	✅ Implementado
+GET	/admin/branches/:id/modules	Obtener módulos de la sede	✅ Implementado
+PUT	/admin/branches/:id/modules	Configurar módulos de la sede	✅ Implementado
 2.6 Gestión de Mesas
 Método	Endpoint	Descripción	Estado
-GET	/admin/branches/:branchId/tables	Listar mesas de una sede	❌ No implementado
-POST	/admin/branches/:branchId/tables	Crear nueva mesa	❌ No implementado
-PUT	/admin/tables/:id	Actualizar mesa	❌ No implementado
-DELETE	/admin/tables/:id	Eliminar mesa	❌ No implementado
-PUT	/admin/tables/reorder	Reordenar mesas (mapa visual)	❌ No implementado
+GET	/admin/branches/:branchId/tables	Listar mesas de una sede	✅ Implementado
+POST	/admin/branches/:branchId/tables	Crear nueva mesa	✅ Implementado
+PUT	/admin/tables/:id	Actualizar mesa	✅ Implementado
+DELETE	/admin/tables/:id	Eliminar mesa	✅ Implementado
+PUT	/admin/tables/reorder	Reordenar mesas (mapa visual)	⚠️ No existe ruta exacta; usa /admin/branch/:branchId/tables/layout
 2.7 Gestión de Pedidos (Admin)
 Método	Endpoint	Descripción	Estado
-GET	/admin/orders	Listar pedidos (con filtros)	❌ No implementado
-GET	/admin/orders/:id	Obtener detalle de pedido	❌ No implementado
-PUT	/admin/orders/:id/status	Actualizar estado del pedido	❌ No implementado
+GET	/admin/orders	Listar pedidos (con filtros)	✅ Implementado
+GET	/admin/orders/:id	Obtener detalle de pedido	✅ Implementado
+PUT	/admin/orders/:id/status	Actualizar estado del pedido	✅ Implementado
 GET	/admin/orders/export	Exportar pedidos a CSV/Excel	❌ No implementado
 2.8 Configuración
 Método	Endpoint	Descripción	Estado
-GET	/admin/settings	Obtener configuración general	❌ No implementado
-PUT	/admin/settings	Actualizar configuración general	❌ No implementado
-PUT	/admin/settings/appearance	Actualizar colores, logo, tema	❌ No implementado
+GET	/admin/settings	Obtener configuración general	✅ Implementado
+PUT	/admin/settings	Actualizar configuración general	✅ Implementado
+PUT	/admin/settings/appearance	Actualizar colores, logo, tema	⚠️ No existe ruta exacta; usa /admin/settings/colors, /admin/settings/logo, /admin/settings/whatsapp
 GET	/admin/settings/qr/:branchId	Generar QR para sede/mesa	❌ No implementado
 🟡 3. ENDPOINTS DE WEBHOOKS
 Método	Endpoint	Descripción	Estado
@@ -88,9 +89,9 @@ POST	/webhook/whatsapp	Webhook de WhatsApp Business API	❌ No implementado
 POST	/webhook/payment	Webhook de pasarela de pagos	❌ No implementado
 📊 RESUMEN POR ESTADO
 Estado	Cantidad	Porcentaje
-✅ Implementado	12	~15%
-⚠️ Parcial	2	~2.5%
-❌ No implementado	~65	~82.5%
+✅ Implementado	~40	~50%
+⚠️ Parcial	~6	~7.5%
+❌ No implementado	~33	~42.5%
 TOTAL	~79	100%
 
 # CONTEXTO

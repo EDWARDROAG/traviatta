@@ -1,61 +1,58 @@
 /**
- * ======================================================
- * ARCHIVO: vite.config.js
- * UBICACIÓN: menu-qr-system/frontend/vite.config.js
- * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 12:15
- *
- * 🎯 PROPÓSITO:
- * Configuración de Vite para el frontend del menú digital.
- * Define el plugin de React, el servidor de desarrollo,
- * y la configuración de build para producción.
- *
- * 📦 DEPENDENCIAS:
- * - @vitejs/plugin-react: Soporte JSX y Fast Refresh
- * - vite: Build tool principal
- *
- * 🔗 RELACIONES:
- * - Importado por: package.json (scripts)
- * - Utilizado en: desarrollo y build
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-16 12:15
- *    ✅ Creación inicial del archivo
- *    ✅ Configuración de plugin React
- *    ✅ Proxy para API en desarrollo
- *    ✅ Configuración de puerto alternativo
- * ======================================================
+ * Contrato: Vite config — front en puerto libre; proxy API opcional.
+ * Consumidores: npm run dev / build.
  */
-
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 8080,
-    host: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3005',
-        changeOrigin: true,
-      },
-    },
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    minify: 'terser',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          state: ['zustand'],
-          utils: ['axios', 'qrcode.react'],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const base = process.env.VITE_BASE_PATH || env.VITE_BASE_PATH || '/';
+  /** 8080 suele estar ocupado; default 8081 */
+  const frontendPort = Number(env.VITE_DEV_PORT || 8081);
+  const apiTarget = env.VITE_PROXY_TARGET || 'http://localhost:3005';
+
+  return {
+    base,
+    plugins: [react()],
+    server: {
+      port: frontendPort,
+      strictPort: false,
+      host: true,
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+          // No tumbar el front si el backend no está: el cliente usa menú estático
+          configure: (proxy) => {
+            proxy.on('error', (err, _req, res) => {
+              console.warn('[vite proxy]', err.code || err.message);
+              if (res && !res.headersSent) {
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'API no disponible' }));
+              }
+            });
+          },
         },
       },
     },
-  },
+    preview: {
+      port: frontendPort,
+      strictPort: false,
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      minify: 'terser',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            state: ['zustand'],
+            utils: ['axios', 'qrcode.react'],
+          },
+        },
+      },
+    },
+  };
 });

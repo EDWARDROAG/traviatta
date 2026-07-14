@@ -2,30 +2,21 @@
  * ======================================================
  * ARCHIVO: ProductCard.jsx
  * UBICACIÓN: menu-qr-system/frontend/src/components/ProductCard.jsx
- * FASE: F1
- * VERSIÓN: 1.0
- * ÚLTIMA ACTUALIZACIÓN: 2024-01-16 14:00
- *
+ * FASE: UI/UX Premium
+ * VERSIÓN: 2.0
+ * ÚLTIMA ACTUALIZACIÓN: 2026-05-24
+ * ======================================================
  * 🎯 PROPÓSITO:
- * Componente que muestra la información de un producto
- * en el menú digital. Incluye imagen, nombre, descripción,
- * precio, etiquetas (popular, nuevo, vegano) y botón
- * de agregar al carrito.
+ * Componente de tarjeta de producto premium para el menú digital.
+ * Diseño editorial elegante que refleja la estética gourmet de Traviatta.
  *
- * 📦 DEPENDENCIAS:
- * - react: Librería UI
- *
- * 🔗 RELACIONES:
- * - Importado por: MenuPage.jsx, TableMenuPage.jsx
- *
- * 📋 HISTORIAL DE CAMBIOS:
- * ------------------------------------------------------
- * 1.0 - 2024-01-16 14:00
- *    ✅ Creación inicial del archivo
- *    ✅ Visualización de imagen producto
- *    ✅ Etiquetas promocionales
- *    ✅ Botón agregar con cantidad
- *    ✅ Soporte para modificadores/extras
+ * 🎨 MEJORAS VISUALES:
+ * - Tarjeta con sombra cálida y borde orgánico
+ * - Imagen con efecto zoom suave al hover
+ * - Tipografía elegante (Playfair Display para nombres)
+ * - Badges con colores de la paleta Traviatta
+ * - Botón de agregar rediseñado con hover elegante
+ * - Transiciones suaves en todas las interacciones
  * ======================================================
  */
 
@@ -35,6 +26,7 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
   const [quantity, setQuantity] = useState(1);
   const [selectedModifiers, setSelectedModifiers] = useState({});
   const [showModifiers, setShowModifiers] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const hasModifiers = product.modifiers && product.modifiers.length > 0;
 
@@ -84,75 +76,104 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
   const finalPriceLabel = finalPrice > 0 ? `$${finalPrice.toLocaleString()}` : 'Consultar precio';
   const canAddToCart = product.is_available && finalPrice > 0;
 
+  // Determinar badge según tags
+  const getBadge = () => {
+    if (product.tags?.includes('popular')) {
+      return { text: '🔥 Popular', className: 'badge-recommended' };
+    }
+    if (product.tags?.includes('nuevo')) {
+      return { text: '✨ Nuevo', className: 'badge-new' };
+    }
+    if (product.tags?.includes('vegano')) {
+      return { text: '🌱 Vegano', className: 'badge-vegetarian' };
+    }
+    if (product.is_spicy) {
+      return { text: '🌶️ Picante', className: 'badge-spicy' };
+    }
+    return null;
+  };
+
+  const badge = getBadge();
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition">
-      <div className="flex">
-        {/* Imagen del producto */}
+    <div className="card-premium group">
+      <div className="flex flex-col sm:flex-row">
+        {/* Imagen del producto con efecto zoom */}
         {product.image_url && (
-          <div className="w-24 h-24 flex-shrink-0">
+          <div className="relative w-full sm:w-32 h-32 flex-shrink-0 overflow-hidden bg-cream">
+            {!imageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-terracotta border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
               loading="lazy"
+              onLoad={() => setImageLoaded(true)}
             />
           </div>
         )}
         
         {/* Información del producto */}
-        <div className="flex-1 p-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-semibold text-gray-800">{product.name}</h3>
+        <div className="flex-1 p-4">
+          <div className="flex flex-wrap justify-between items-start gap-2">
+            <div className="flex-1">
+              <h3 className="font-heading text-lg font-semibold text-charcoal">
+                {product.name}
+              </h3>
               {product.description && (
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</p>
+                <p className="text-sm text-stone mt-1 line-clamp-2">
+                  {product.description}
+                </p>
               )}
             </div>
-            <span className="font-bold text-orange-600 text-sm">
+            <span className="font-heading text-xl font-bold text-terracotta whitespace-nowrap">
               {priceLabel}
             </span>
           </div>
           
-          {/* Etiquetas */}
-          {product.tags && product.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {product.tags.includes('popular') && (
-                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">🔥 Popular</span>
-              )}
-              {product.tags.includes('nuevo') && (
-                <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded">✨ Nuevo</span>
-              )}
-              {product.tags.includes('vegano') && (
-                <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded">🌱 Vegano</span>
-              )}
-              {product.tags.includes('sin_gluten') && (
-                <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">🚫 Sin gluten</span>
-              )}
+          {/* Badge - usando sistema premium */}
+          {badge && (
+            <div className="mt-2">
+              <span className={`badge-premium ${badge.className}`}>
+                {badge.text}
+              </span>
             </div>
           )}
           
           {/* Modificadores/extras */}
           {hasModifiers && (
-            <div className="mt-2">
+            <div className="mt-3">
               <button
                 onClick={() => setShowModifiers(!showModifiers)}
-                className="text-xs text-orange-600 underline"
+                className="text-xs text-terracotta hover:text-terracotta-dark transition-smooth flex items-center gap-1"
               >
-                {showModifiers ? 'Ocultar extras' : '+ Agregar extras'}
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                {showModifiers ? 'Ocultar extras' : 'Agregar extras'}
               </button>
               
               {showModifiers && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1.5 bg-cream/50 rounded-xl p-3 animate-fade-in">
                   {product.modifiers.map((modifier) => (
-                    <label key={modifier.name} className="flex items-center text-xs">
-                      <input
-                        type="checkbox"
-                        checked={!!selectedModifiers[modifier.name]}
-                        onChange={() => toggleModifier(modifier.name)}
-                        className="mr-2"
-                      />
-                      <span>{modifier.name}</span>
-                      <span className="ml-auto text-gray-500">+${modifier.price.toLocaleString()}</span>
+                    <label key={modifier.name} className="flex items-center justify-between text-sm cursor-pointer hover:bg-cream p-1 rounded-lg transition">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedModifiers[modifier.name]}
+                          onChange={() => toggleModifier(modifier.name)}
+                          className="w-4 h-4 rounded border-stone text-terracotta focus:ring-terracotta focus:ring-offset-0"
+                        />
+                        <span className="text-charcoal">{modifier.name}</span>
+                      </div>
+                      <span className="text-terracotta text-sm font-medium">
+                        +${modifier.price.toLocaleString()}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -161,32 +182,36 @@ function ProductCard({ product, onAddToCart, showDelivery = true }) {
           )}
           
           {/* Control de cantidad y botón agregar */}
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center border rounded-lg">
+          <div className="flex items-center justify-between mt-4 pt-2 border-t border-stone/30 gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="px-2 py-1 text-gray-600 hover:bg-gray-100"
+                className="w-10 h-10 rounded-full border border-stone text-charcoal hover:border-terracotta hover:text-terracotta transition-smooth flex items-center justify-center"
+                aria-label="Disminuir cantidad"
               >
                 -
               </button>
-              <span className="w-8 text-center text-sm">{quantity}</span>
+              <span className="w-8 text-center font-medium text-charcoal">
+                {quantity}
+              </span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="px-2 py-1 text-gray-600 hover:bg-gray-100"
+                className="w-10 h-10 rounded-full border border-stone text-charcoal hover:border-terracotta hover:text-terracotta transition-smooth flex items-center justify-center"
+                aria-label="Aumentar cantidad"
               >
                 +
               </button>
             </div>
             
             {!product.is_available ? (
-              <span className="text-red-500 text-sm">No disponible</span>
+              <span className="text-terracotta text-sm font-medium">No disponible</span>
             ) : (
               <button
                 onClick={handleAddToCart}
-                className={`bg-orange-600 text-white px-4 py-1 rounded-lg text-sm font-medium hover:bg-orange-700 transition ${!canAddToCart ? 'opacity-60 cursor-not-allowed' : ''}`}
                 disabled={!canAddToCart}
+                className={`btn-primary text-sm px-4 sm:px-5 py-2.5 min-h-[44px] flex-1 sm:flex-none max-w-full ${!canAddToCart ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {canAddToCart ? `Agregar ${finalPriceLabel}` : 'Consultar precio'}
+                Agregar {finalPriceLabel !== priceLabel && `• ${finalPriceLabel}`}
               </button>
             )}
           </div>

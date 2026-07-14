@@ -157,16 +157,23 @@ const getPaymentMethodName = (method) => {
  * @param {string} message - Mensaje a enviar
  * @returns {boolean} True si se pudo abrir WhatsApp
  */
+/**
+ * Genera el enlace de WhatsApp y abre el mensaje.
+ * Normaliza a E164 CO si llega un celular de 10 dígitos (3…).
+ */
 const sendWhatsAppMessage = (phoneNumber, message) => {
   if (!phoneNumber) {
     console.error('WhatsApp number is required');
     return false;
   }
-  
-  const cleanNumber = cleanPhoneNumber(phoneNumber);
+
+  let cleanNumber = cleanPhoneNumber(phoneNumber);
+  if (cleanNumber.length === 10 && cleanNumber.startsWith('3')) {
+    cleanNumber = `57${cleanNumber}`;
+  }
   const encodedMessage = encodeURIComponent(message);
   const url = `https://wa.me/${cleanNumber}?text=${encodedMessage}`;
-  
+
   window.open(url, '_blank');
   return true;
 };

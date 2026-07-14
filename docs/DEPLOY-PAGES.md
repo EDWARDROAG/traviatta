@@ -2,7 +2,7 @@
 
 Objetivo: generar un **link público** para enviárselo al cliente (como Pañalera Grace → `https://edwardroag.github.io/PA-ALERA_GRACE/`).
 
-Repo actual: [lamakinetfood-png/lamakinetfood](https://github.com/lamakinetfood-png/lamakinetfood).
+Repo actual: [EDWARDROAG/traviatta](https://github.com/EDWARDROAG/traviatta).
 
 ---
 
@@ -41,10 +41,10 @@ Los YAML actuales `build.yml` / `deploy.yml` / `test.yml` están **vacíos**; HU
 Tras push a `main` y el primer run exitoso:
 
 ```text
-https://lamakinetfood-png.github.io/lamakinetfood/
+https://edwardroag.github.io/traviatta/
 ```
 
-Confirmá en Settings → Pages. Base de build: `VITE_BASE_PATH=/lamakinetfood/`.
+Confirmá en Settings → Pages. Base de build: `VITE_BASE_PATH=/traviatta/`.
 
 ## Estado workflow
 
@@ -55,7 +55,7 @@ Archivos listos:
 | `.github/workflows/deploy-pages.yml` | Build Vite + publicar Pages |
 | `.github/workflows/ci.yml` | Build de verificación en push/PR |
 | `frontend/package-lock.json` | **Debe ir en el commit** (`npm ci`) |
-| `VITE_BASE_PATH=/lamakinetfood/` | Base del project site |
+| `VITE_BASE_PATH=/traviatta/` | Base del project site |
 | `VITE_USE_STATIC_MENU=true` | Carta QR sin API en el preview |
 
 **Importante:** el `.gitignore` ya no ignora `package-lock.json` (antes hacía fallar Actions).
@@ -65,7 +65,7 @@ Archivos listos:
 1. Commit + push a `main` (incluye `frontend/package-lock.json` y workflows)
 2. Repo → **Settings → Pages → Source: GitHub Actions**
 3. Actions → workflow **Deploy frontend (Pages)** en verde
-4. Abrir: https://lamakinetfood-png.github.io/lamakinetfood/
+4. Abrir: https://edwardroag.github.io/traviatta/
 
 ---
 

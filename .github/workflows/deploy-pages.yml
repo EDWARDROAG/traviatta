@@ -1,5 +1,5 @@
 # Despliega el frontend React (Vite) en GitHub Pages.
-# URL esperada: https://lamakinetfood-png.github.io/lamakinetfood/
+# URL esperada: https://edwardroag.github.io/traviatta/
 #
 # Una sola vez en GitHub:
 #   Settings → Pages → Build and deployment → Source: GitHub Actions
@@ -44,8 +44,8 @@ jobs:
       - name: Instalar y construir frontend
         working-directory: frontend
         env:
-          # Project site bajo /lamakinetfood/
-          VITE_BASE_PATH: /lamakinetfood/
+          # Project site bajo /traviatta/
+          VITE_BASE_PATH: /traviatta/
           # Carta digital sin API (staticMenus)
           VITE_USE_STATIC_MENU: 'true'
         run: |
@@ -83,6 +83,6 @@ jobs:
           echo "## Vista previa publicada" >> "$GITHUB_STEP_SUMMARY"
           echo "**URL:** ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Base Vite: \`/lamakinetfood/\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Base Vite: \`/traviatta/\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Menú estático: \`VITE_USE_STATIC_MENU=true\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Repo: \`lamakinetfood-png/lamakinetfood\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repo: \`EDWARDROAG/traviatta\`" >> "$GITHUB_STEP_SUMMARY"
